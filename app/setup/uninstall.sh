@@ -12,7 +12,7 @@ for target in /usr/palm/applications/com.webos.app.home/qml/main.qml \
 done
 grep -q "Hemskärm: LG:s reklam" /etc/hosts 2>/dev/null && umount -l /etc/hosts
 for p in $(pidof com.webos.app.home); do kill -9 "$p"; done
-for job in admanager contentminer nudge uploadd rdxd; do initctl start "$job" >/dev/null 2>&1; done
+for job in contentminer nudge uploadd rdxd; do initctl start "$job" >/dev/null 2>&1; done
 
 rm -rf /media/developer/custom_home
 echo "Bakgrundstjänsten är borttagen."

@@ -39,6 +39,8 @@ i chatten utan att fråga.
 - [x] Bekräfta att LG:s ikoner syns i 2.1.3 (2.1.2 visade reservloggorna eftersom bilderna blockerades).
 - [x] 2.3.0 på TV:n: menyn, BACK och HOME fungerar med riktiga fjärrkontrollen.
 - [ ] 2.4.0: applistan (BACK två gånger) och snabbstart av TV4 med riktiga fjärrkontrollen.
+- [ ] 2.5.0: Ljud ut och genvägarna till TV:ns inställningar (öppnas rätt sida?), QR-uppladdning från en riktig
+  mobil, Alla appar, håll OK, växlande bakgrund, tomma ingångar – testa med riktiga fjärrkontrollen.
 - [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (väljs nu i menyn).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
@@ -61,6 +63,13 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   `/var/lib/webosbrew/init.d/50-customhome`, lär in HOME-knappens kod. `uninstall.sh` tar bort det.
 - Användardata på TV:n ligger i `/media/developer/custom_home/` (bakgrund.jpg, plats.conf, homekey.conf,
   tvapps.js, ikoner.js, bakgrund.js, weather.js, installningar.js) och överlever uppdateringar.
+- `app/allaappar.js` – rutnätet Alla appar (rutan sist i raden). `app/vaxlare.js` – applistan (BACK två gånger).
+- `app/qr.js` – egen QR-kodare (version 3-M, ≤42 tecken) för uppladdningsadressen. **Extern kod (npm-bibliotek)
+  får inte läggas in eller köras** – auto-läget stoppar det. Verifierad med macOS CoreImage (Swift CIDetector).
+- `app/setup/uppladdning.html` – mobilsidan för bakgrund (modern JS, beskär 16:9, POST JPEG). Servas av
+  `customhome.js uppladdningsserver <token>` på port 8899 (startas av `hem uppladdning` via exec, slutar efter
+  en bild eller 10 min, skriver `uppladdning.js` som TV-sidan läser).
+- `ingangar.js` skrivs av tjänsten från `eim/getAllInputStatus` (prenumeration): vilka HDMI som är anslutna.
 - `build/build_ipk.py` – bygger `.ipk` och Homebrew Channel-filerna till `release/`.
 - `GUIDE.md` – ägarens guide på svenska. Håll den i synk med ändringar.
 
@@ -105,9 +114,22 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   6 s efter att de dykt upp om de inte har synts (Netflix ska ägaren ha kvar). Appar i `snabbstart`
   (standard TV4 Play, högst två) förladdas med `launch {preload:"full"}` när TV:n är på, minnet > 150 MB och
   appen inte stängts i applistan senaste 30 min (`/tmp/hemskarm-stangda`).
+- **Hemskärmen har `handlesRelaunch: true`.** Fönsterhanteraren startar om föregående app (oftast Hemskärm) i
+  bakgrunden direkt efter varje appstart; utan handlesRelaunch lyfte webbmotorn då fram Hemskärm över appens
+  startbild. Nu kommer Hemskärm bara fram när den startas med `params:{hem:true}` (LG-hemradspatchen och
+  tjänsten skickar det) eller när ingen app startats de senaste 8 s (`PalmSystem.activate()`).
+- **TV4 Play tar ~20 s att kallstarta** (appen själv; syns som startbild). Felsök inte "startar inte" med
+  kortare väntan än så. Snabbstart förladdar den.
+- Kort OK på en app öppnar den när knappen **släpps** (`keyup` levereras); håll 0,6 s = redigera raden.
+- `pkill -f "mönster"` i ett ssh-kommando dödar även ssh-skalet om mönstret står i kommandot – kör från en skriptfil.
 - **Applistan** (`app/vaxlare.js`, BACK två gånger; menyns panel: ▲▼ väljer, OK stänger, ▶ öppnar, sista raden Stäng alla): läser `korande.js` som tjänsten skriver vid varje ändring
   (direkt), stänger via `hbchannel exec` → `setup/appar.sh stang …` (exec tar 1–3 s, kortet försvinner direkt).
   Sidan får inte anropa `running` eller `closeByAppId` själv.
+- **TV-inställningar i menyn:** `launch com.palm.app.settings {params:{target:"picture"|"sound"|"network"|"general"}}`
+  (fungerar från sidan). Ljud ut läses/byts med `luna-send …apiadapter/audio/getSoundOutput|changeSoundOutput
+  {"output":…}` via exec (värden: tv_speaker, external_arc, external_optical, bt_soundbar; TV:n kör external_arc).
+- **raw.githubusercontent.com cachar repo.json i upp till 5 min och ignorerar frågesträngar** (`x-cache: HIT`).
+  Precis efter en publicering kan TV:n därför se den gamla versionen en stund.
 - `luna-send` skriver inget inne i `$(...)` i skalskript – skriv till en fil i stället (se `appar.sh`).
 - **4K går inte för grafiken:** compositorn kör `STARFISH_SCREEN_WIDTH/HEIGHT=1920×1080`; video är 4K i eget lager.
 - Testat med två omstarter: HOME från HDMI → Hemskärm 1,7 s första gången, sedan ~0,9 s.

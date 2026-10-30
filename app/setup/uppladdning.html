@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Bakgrund till TV:n</title>
+<!--
+  Visas på mobilen när man skannar QR-koden i hemskärmens meny (Bakgrund → Ladda upp från mobilen).
+  Serveras av bakgrundstjänsten på TV:n (customhome.js uppladdningsserver). Mobilens webbläsare är
+  modern, så här går det bra med ny JavaScript. Bilden beskärs till 16:9 och skickas som 1920×1080 JPEG.
+-->
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px 16px 40px; background: #0b0d14; color: #fff; font: 17px/1.4 -apple-system, system-ui, sans-serif; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  p { color: rgba(255,255,255,0.7); margin: 0 0 18px; }
+  .knapp { display: block; width: 100%; padding: 15px; border: 0; border-radius: 14px; font-size: 18px; font-weight: 600; text-align: center; }
+  .val { background: #2b2f3d; color: #fff; }
+  .spara { background: #ff4757; color: #fff; margin-top: 16px; }
+  .spara:disabled { opacity: 0.5; }
+  #ram { position: relative; width: 100%; aspect-ratio: 16 / 9; margin-top: 18px; overflow: hidden; border-radius: 12px; background: #000; touch-action: none; display: none; }
+  #ram canvas { width: 100%; height: 100%; display: block; }
+  label.zoom { display: none; margin-top: 14px; color: rgba(255,255,255,0.7); }
+  input[type=range] { width: 100%; }
+  #status { margin-top: 16px; min-height: 24px; font-weight: 600; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+  <h1>Bakgrund till TV:n</h1>
+  <p>Välj ett foto. Dra i bilden för att flytta den och zooma med reglaget, så att rätt del syns på TV:n.</p>
+  <label class="knapp val" for="fil">Välj foto</label>
+  <input type="file" id="fil" accept="image/*">
+  <div id="ram"><canvas id="vy" width="960" height="540"></canvas></div>
+  <label class="zoom" id="zoomrad">Zoom<input type="range" id="zoom" min="1" max="3" step="0.01" value="1"></label>
+  <button class="knapp spara" id="spara" disabled>Spara på TV:n</button>
+  <div id="status"></div>
+<script>
+const W = 1920, H = 1080;
+const vy = document.getElementById("vy"), ctx = vy.getContext("2d");
+const status = document.getElementById("status"), spara = document.getElementById("spara");
+let bild = null, zoom = 1, cx = 0.5, cy = 0.5; // mitten av utsnittet, som andel av bilden
+
+// Utsnittet (16:9) i bildens pixlar, så stort som zoomen tillåter och inom bilden.
+function utsnitt() {
+  const bas = Math.min(bild.width / W, bild.height / H);
+  const w = W * bas / zoom, h = H * bas / zoom;
+  const x = Math.min(Math.max(cx * bild.width - w / 2, 0), bild.width - w);
+  const y = Math.min(Math.max(cy * bild.height - h / 2, 0), bild.height - h);
+  return { x, y, w, h };
+}
+function rita(canvas, c) {
+  const u = utsnitt();
+  c.drawImage(bild, u.x, u.y, u.w, u.h, 0, 0, canvas.width, canvas.height);
+}
+
+document.getElementById("fil").addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    bild = img; zoom = 1; cx = cy = 0.5;
+    document.getElementById("zoom").value = 1;
+    document.getElementById("ram").style.display = "block";
+    document.getElementById("zoomrad").style.display = "block";
+    spara.disabled = false;
+    status.textContent = "";
+    rita(vy, ctx);
+  };
+  img.onerror = () => { status.textContent = "Kunde inte läsa bilden. Prova en annan (JPEG eller PNG)."; };
+  img.src = URL.createObjectURL(f);
+});
+
+document.getElementById("zoom").addEventListener("input", e => { zoom = +e.target.value; if (bild) rita(vy, ctx); });
+
+// Dra för att flytta utsnittet
+let drag = null;
+vy.addEventListener("pointerdown", e => { if (bild) { drag = { x: e.clientX, y: e.clientY, cx, cy }; vy.setPointerCapture(e.pointerId); } });
+vy.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const u = utsnitt(), skala = u.w / vy.clientWidth;
+  cx = drag.cx - (e.clientX - drag.x) * skala / bild.width;
+  cy = drag.cy - (e.clientY - drag.y) * skala / bild.height;
+  rita(vy, ctx);
+});
+vy.addEventListener("pointerup", () => { if (drag) { const u = utsnitt(); cx = (u.x + u.w / 2) / bild.width; cy = (u.y + u.h / 2) / bild.height; } drag = null; });
+
+spara.addEventListener("click", () => {
+  const ut = document.createElement("canvas");
+  ut.width = W; ut.height = H;
+  rita(ut, ut.getContext("2d"));
+  spara.disabled = true;
+  status.textContent = "Skickar till TV:n…";
+  ut.toBlob(blob => {
+    fetch(location.pathname.replace(/\/$/, "") + "/bild", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob })
+      .then(r => { if (!r.ok) throw new Error(r.status); status.textContent = "Klart! Bilden visas på TV:n om en liten stund."; })
+      .catch(() => { status.textContent = "Det gick inte att skicka. Är TV:ns uppladdningsruta fortfarande öppen?"; spara.disabled = false; });
+  }, "image/jpeg", 0.88);
+});
+</script>
+</body>
+</html>

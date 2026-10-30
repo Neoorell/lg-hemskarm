@@ -68,6 +68,60 @@ var Meny = (function() {
     }
   }
 
+  function exec(command, cb) {
+    luna("luna://org.webosbrew.hbchannel.service/exec", { command: command }, function(r) {
+      cb(r && r.returnValue ? r.stdoutString || "" : null);
+    });
+  }
+
+  // ---- TV:ns egna inställningar ----
+  // Ljudutgången läses och byts med luna-send via Homebrew Channels exec (sidan får inte själv);
+  // bild, ljud och nätverk öppnar LG:s inställningsapp direkt på rätt sida (params.target).
+  var LJUD_UT = [
+    ["tv_speaker", "TV-högtalare"], ["external_arc", "Soundbar (HDMI ARC)"],
+    ["external_optical", "Optisk"], ["bt_soundbar", "Bluetooth"]
+  ];
+  var soundOut = null;
+  function soundName(id) {
+    for (var i = 0; i < LJUD_UT.length; i++) if (LJUD_UT[i][0] === id) return LJUD_UT[i][1];
+    return id;
+  }
+  function readSoundOut() {
+    exec("luna-send -n 1 luna://com.webos.service.apiadapter/audio/getSoundOutput '{}'", function(out) {
+      var m = /"soundOutput"\s*:\s*"([a-z_]+)"/.exec(out || "");
+      if (!m) return;
+      soundOut = m[1];
+      var fn = open && top().fn;
+      if (fn === pageMain || fn === pageSound) refresh(rows[cur] && rows[cur].key);
+    });
+  }
+  function setSoundOut(id) {
+    $("m-sub").textContent = "Byter till " + soundName(id) + "…";
+    exec("luna-send -n 1 luna://com.webos.service.apiadapter/audio/changeSoundOutput '{\"output\":\"" + id + "\"}'", function(out) {
+      if (/"returnValue"\s*:\s*true/.test(out || "")) soundOut = id;
+      else toast("Kunde inte byta ljudutgång");
+      if (open && top().fn === pageSound) refresh(id);
+    });
+  }
+  function pageSound() {
+    return {
+      title: "Ljud ut",
+      sub: "Var ljudet ska komma ut. Fler val (t.ex. hörlurar) finns i TV:ns ljudinställningar.",
+      hint: "<b>OK</b> välj · <b>BACK</b> tillbaka",
+      rows: LJUD_UT.map(function(o) {
+        return { key: o[0], label: o[1], value: o[0] === soundOut ? "Vald" : "", on: o[0] === soundOut,
+                 ok: function() { if (o[0] !== soundOut) setSoundOut(o[0]); } };
+      }).concat([{ key: "fler", label: "Fler ljudval i TV:ns inställningar", value: "TV:ns meny",
+                   ok: function() { openTv("sound"); } }])
+    };
+  }
+  function openTv(target) {
+    luna("luna://com.webos.applicationManager/launch", { id: "com.palm.app.settings", params: { target: target } }, function(r) {
+      if (r && r.returnValue === false) toast("Kunde inte öppna TV:ns inställningar");
+    });
+    close();
+  }
+
   // ---- sidor ----
 
   function pageMain() {
@@ -85,6 +139,11 @@ var Meny = (function() {
           value: state.snabbstart.map(function(id) { var a = tvApp(id); return a ? a.title : null; })
             .filter(Boolean).join(", ") || "Av",
           ok: function() { go(pageQuick); } },
+        { key: "ljudut", label: "Ljud ut", value: soundOut ? soundName(soundOut) : "", ok: function() { go(pageSound); } },
+        { key: "tvbild", label: "Bildinställningar", value: "TV:ns meny", ok: function() { openTv("picture"); } },
+        { key: "tvljud", label: "Ljudinställningar", value: "TV:ns meny", ok: function() { openTv("sound"); } },
+        { key: "tvnat", label: "Nätverk och wifi", value: "TV:ns meny", ok: function() { openTv("network"); } },
+        { key: "tvallm", label: "Allmänna TV-inställningar", value: "TV:ns meny", ok: function() { openTv("general"); } },
         { key: "upd", label: "Uppdateringar", value: UPPDATERING ? "Version " + UPPDATERING.version + " finns" : "",
           on: !!UPPDATERING, ok: function() { go(pageUpdates); } },
         { key: "stang", label: changed ? "Spara och stäng" : "Stäng", ok: close }
@@ -161,10 +220,15 @@ var Meny = (function() {
       title: "Ingångar",
       sub: "Välj vilka ingångar som visas och vad de heter.",
       hint: "<b>OK</b> ändra · <b>BACK</b> tillbaka",
-      rows: state.ingangar.map(function(inp, n) {
-        return { key: inp.id, label: inp.namn, value: inp.dold ? "Dold" : "Visas", on: !inp.dold,
-                 ok: function() { go(pageInput(n)); } };
-      })
+      rows: [{ key: "tomma", label: "Dölj ingångar utan något anslutet", value: state.doljTomma ? "På" : "Av",
+               on: state.doljTomma,
+               ok: function() { state.doljTomma = !state.doljTomma; mark("doljTomma"); refresh("tomma"); } }]
+        .concat(state.ingangar.map(function(inp, n) {
+          var empty = !inputConnected(inp.id);
+          return { key: inp.id, label: inp.namn,
+                   value: inp.dold ? "Dold" : (empty ? "Inget anslutet" : "Visas"), on: !inp.dold && !empty,
+                   ok: function() { go(pageInput(n)); } };
+        }))
     };
   }
   function pageInput(n) {
@@ -193,13 +257,100 @@ var Meny = (function() {
     var list = (window.TV_BAKGRUND ? [{ id: "egen", namn: "Egen bild" }] : []).concat(BAKGRUNDER);
     return {
       title: "Bakgrund",
-      sub: window.TV_BAKGRUND ? "" : "Egen bild: se guiden (bakgrund.jpg på TV:n).",
+      sub: "Välj en bild, låt den växla, eller ladda upp en egen från mobilen.",
       hint: "<b>OK</b> välj – bakgrunden byts direkt · <b>BACK</b> tillbaka",
-      rows: list.map(function(b) {
-        return { key: b.id, label: b.namn, value: b.id === state.bakgrund ? "Vald" : "", on: b.id === state.bakgrund,
-                 ok: function() { state.bakgrund = b.id; mark("bakgrund"); setBackground(b.id); refresh(b.id); } };
-      })
+      rows: [{ key: "ladda", label: "Ladda upp från mobilen", value: "QR-kod", ok: function() { go(pageUpload, stopUpload); } },
+             { key: "vaxla", label: "Växla bakgrund var 15:e minut", value: state.vaxlaBakgrund ? "På" : "Av",
+               on: state.vaxlaBakgrund,
+               ok: function() {
+                 state.vaxlaBakgrund = !state.vaxlaBakgrund;
+                 mark("vaxlaBakgrund");
+                 setBackground(state.vaxlaBakgrund ? rotatingId() : state.bakgrund);
+                 refresh("vaxla");
+               } }].concat(list.map(function(b) {
+        var chosen = !state.vaxlaBakgrund && b.id === state.bakgrund;
+        return { key: b.id, label: b.namn, value: chosen ? "Vald" : "", on: chosen,
+                 ok: function() {
+                   state.bakgrund = b.id;
+                   mark("bakgrund");
+                   if (state.vaxlaBakgrund) { state.vaxlaBakgrund = false; mark("vaxlaBakgrund"); }
+                   setBackground(b.id);
+                   refresh(b.id);
+                 } };
+      }))
     };
+  }
+
+  // Bakgrund från mobilen: tjänsten startar en tillfällig uppladdningssida ("hem uppladdning"),
+  // TV:n visar adressen som QR-kod och följer förloppet i uppladdning.js.
+  var upload = null;
+  var UPLOAD_TEXT = {
+    vantar: "Väntar på en bild från mobilen…", "tar emot": "Tar emot bilden…",
+    fel: "Bilden kunde inte tas emot. Försök igen.", stangd: "Tiden gick ut. Öppna sidan igen."
+  };
+  function pageUpload() {
+    return {
+      title: "Ladda upp från mobilen",
+      sub: "Skanna koden med mobilens kamera. Mobilen ska vara på samma wifi som TV:n.",
+      hint: "<b>BACK</b> avbryt",
+      rows: [],
+      custom: function(list) {
+        var box = document.createElement("div");
+        box.className = "m-upload";
+        box.innerHTML = '<canvas width="320" height="320"></canvas>' +
+          '<div class="m-upload-text"><div class="m-upload-url">Startar…</div><div class="m-upload-status"></div></div>';
+        list.appendChild(box);
+        startUpload(box);
+      }
+    };
+  }
+  function drawQr(canvas, text) {
+    var m = qrMatrix(text);
+    if (!m) return;
+    var c = canvas.getContext("2d"), n = m.length, cell = Math.floor(canvas.width / (n + 6));
+    var off = Math.floor((canvas.width - cell * n) / 2);
+    c.fillStyle = "#fff";
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    c.fillStyle = "#000";
+    for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) if (m[y][x]) c.fillRect(off + x * cell, off + y * cell, cell, cell);
+  }
+  function startUpload(box) {
+    var started = Date.now(), my = upload = { done: false, timer: null };
+    function setStatus(t) { box.querySelector(".m-upload-status").textContent = t; }
+    exec("sh /media/developer/custom_home/hem uppladdning", function(out) {
+      if (upload !== my) return;
+      var info = null;
+      try { info = JSON.parse((out || "").slice((out || "").indexOf("{"))); } catch (e) {}
+      if (!info || !info.url) { box.querySelector(".m-upload-url").textContent = (info && info.fel) || "Kunde inte starta uppladdningen."; return; }
+      drawQr(box.querySelector("canvas"), info.url);
+      box.querySelector(".m-upload-url").textContent = info.url.replace(/^http:\/\//, "");
+      setStatus(UPLOAD_TEXT.vantar);
+      my.timer = setInterval(function() {
+        var sc = document.createElement("script");
+        sc.onload = sc.onerror = function() {
+          document.head.removeChild(sc);
+          var st = window.TV_UPPLADDNING;
+          if (upload !== my || !st || st.tid < started) return;
+          if (st.status !== "klar") return setStatus(UPLOAD_TEXT[st.status] || "");
+          my.done = true;
+          clearInterval(my.timer);
+          setStatus("Klart! Bilden är sparad.");
+          state.bakgrund = "egen";
+          mark("bakgrund");
+          if (state.vaxlaBakgrund) { state.vaxlaBakgrund = false; mark("vaxlaBakgrund"); }
+          setTimeout(close, 1200); // sparar och laddar om, så att den nya bilden visas
+        };
+        sc.src = "file:///media/developer/custom_home/uppladdning.js?t=" + Date.now();
+        document.head.appendChild(sc);
+      }, 1500);
+    });
+  }
+  function stopUpload() {
+    var my = upload;
+    upload = null;
+    if (!my) return;
+    clearInterval(my.timer);
+    if (!my.done) exec("sh /media/developer/custom_home/hem uppladdning stopp", function() {});
   }
 
   function setOrt(namn, lat, lon) {
@@ -291,9 +442,9 @@ var Meny = (function() {
   // ---- ritning och navigering ----
 
   function top() { return stack[stack.length - 1]; }
-  function go(fn) {
+  function go(fn, leave) {
     top().cur = cur;
-    stack.push({ fn: fn, cur: 0 });
+    stack.push({ fn: fn, cur: 0, leave: leave });
     draw();
   }
   function refresh(key) { draw(key); }
@@ -307,6 +458,7 @@ var Meny = (function() {
     $("m-hint").innerHTML = p.hint;
     var list = $("m-list");
     list.innerHTML = "";
+    if (p.custom) { p.custom(list); return; }
     rows.forEach(function(r, n) {
       var el = document.createElement("div");
       el.className = "m-row" + (r.dim ? " dim" : "");
@@ -381,6 +533,7 @@ var Meny = (function() {
 
   function back() {
     if (stack.length > 1) {
+      if (top().leave) top().leave();
       stack.pop();
       draw();
     } else {
@@ -391,31 +544,26 @@ var Meny = (function() {
   function close() {
     open = false;
     $("meny").className = "fill";
+    stack.forEach(function(s) { if (s.leave) s.leave(); });
     if (changed) save(function() { location.reload(); });
   }
 
   // Sparar via tjänsten: "hem spara <base64>" körs som root av Homebrew Channels exec.
   function save(then) {
     busy = true;
-    var out = copy(INST);
-    if (dirty.appar) out.appar = state.appar.filter(function(id) { return tvApp(id); });
-    if (dirty.ingangar) out.ingangar = state.ingangar;
-    if (dirty.bakgrund) out.bakgrund = state.bakgrund;
-    if (dirty.ort) out.ort = state.ort;
-    if (dirty.snabbstart) out.snabbstart = state.snabbstart;
-    var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(out))));
+    var changes = {};
+    if (dirty.appar) changes.appar = state.appar.filter(function(id) { return tvApp(id); });
+    ["ingangar", "bakgrund", "ort", "snabbstart", "doljTomma", "vaxlaBakgrund"].forEach(function(k) {
+      if (dirty[k]) changes[k] = state[k];
+    });
     toast("Sparar…");
-    luna("luna://org.webosbrew.hbchannel.service/exec",
-      { command: "sh /media/developer/custom_home/hem spara " + b64 }, function(r) {
-        busy = false;
-        if (r && r.returnValue && /OK/.test(r.stdoutString || "")) {
-          changed = false;
-          dirty = {};
-          then();
-        } else {
-          toast("Kunde inte spara inställningarna");
-        }
-      });
+    saveInst(changes, function(ok) {
+      busy = false;
+      if (!ok) return toast("Kunde inte spara inställningarna");
+      changed = false;
+      dirty = {};
+      then();
+    });
   }
 
   return {
@@ -428,11 +576,14 @@ var Meny = (function() {
         ingangar: inputsForMenu(),
         bakgrund: bakgrundId(),
         ort: null,
-        snabbstart: (INST.snabbstart instanceof Array ? INST.snabbstart : ["com.telia.tv4"]).slice()
+        snabbstart: (INST.snabbstart instanceof Array ? INST.snabbstart : ["com.telia.tv4"]).slice(),
+        doljTomma: INST.doljTomma !== false,
+        vaxlaBakgrund: INST.vaxlaBakgrund === true
       };
       dirty = {};
       changed = false;
       upd = null;
+      readSoundOut();
       stack = [{ fn: pageMain, cur: 0 }];
       open = true;
       $("meny").className = "fill show";

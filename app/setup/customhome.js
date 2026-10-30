@@ -6,6 +6,7 @@
 //   node customhome.js apps    läser in TV:ns app-lista till tvapps.js
 //   node customhome.js weather hämtar vädret till weather.js
 //   node customhome.js spara B64 sparar hemskärmens inställningar (base64-kodad JSON) till installningar.js
+//   node customhome.js uppladdning [stopp]  startar (eller stoppar) uppladdningssidan för bakgrund från mobilen
 //
 // Knapp- och påslagsbevakningen bygger på watchers från github.com/NaveenDA/lg-webos-custom-home (MIT).
 
@@ -76,7 +77,7 @@ function launchHome(reason) {
   log("startar hemskärmen (" + reason + ")");
   // En app som redan körs visas bara igen utan att laddas om, så stäng den först.
   luna("luna://com.webos.applicationManager/closeByAppId", { id: APP_ID }, 3000, function() {
-    luna("luna://com.webos.applicationManager/launch", { id: APP_ID }, 5000);
+    luna("luna://com.webos.applicationManager/launch", { id: APP_ID, params: { hem: true } }, 5000);
   });
 }
 
@@ -119,7 +120,12 @@ function patchLgHomeQml(orig) {
     "            var app = rootWindow.interfaces ? rootWindow.interfaces.application : null;",
     "            if (!app || !app.launchApp) return;",
     "            rootWindow.hemskarmPending = false;",
-    "            app.launchApp(\"" + APP_ID + "\", \"\", {}, \"homeKey\");",
+    // Starta utan LG:s hideApp(): när hemraden döljer sig själv tar fönsterhanteraren fram den förra
+    // appen igen, och den och Hemskärm knuffar då undan varandra. Hemraden döljs ändå när Hemskärm visas.
+    "            if (app.services && app.services.launchApp)",
+    "                app.services.launchApp({ id: \"" + APP_ID + "\", params: { hem: true }, reason: \"launcher\" }, function() {});",
+    "            else",
+    "                app.launchApp(\"" + APP_ID + "\", \"\", { hem: true }, \"launcher\");",
     "        }",
     "    }",
     ""
@@ -180,9 +186,11 @@ function blockAdServers() {
   });
 }
 
-// LG:s reklam-, rekommendations- och statistiktjänster (upstart-jobb). De startar igen vid omstart,
+// LG:s rekommendations- och statistiktjänster (upstart-jobb). De startar igen vid omstart,
 // och vissa (nudge) först en stund efter uppstarten, så stoppet görs om med jämna mellanrum.
-var LG_JOBS = ["admanager", "contentminer", "nudge", "uploadd", "rdxd"];
+// (upstart-jobbet admanager skapar bara en cachemapp vid uppstart; själva reklamtjänsten startas vid
+// behov av systemet och kan inte stoppas så. LG:s reklam blockeras i stället via /etc/hosts.)
+var LG_JOBS = ["contentminer", "nudge", "uploadd", "rdxd"];
 function stopLgJobs() {
   var stopped = [], left = LG_JOBS.length;
   LG_JOBS.forEach(function(job) {
@@ -282,13 +290,44 @@ function appsChanged() {
   clearTimeout(checkTimer);
   checkTimer = setTimeout(checkApps, 6000);
 }
-function runningWatcher() {
-  var p = childProcess.spawn("luna-send",
-    ["-i", "-n", "0", "luna://com.webos.applicationManager/running", '{"subscribe":true}']);
-  p.stdout.on("data", appsChanged);
+// Prenumerera på en luna-tjänst och kör onChange när något ändras (startar om om anslutningen tappas).
+function subscribe(uri, onChange) {
+  var p = childProcess.spawn("luna-send", ["-i", "-n", "0", uri, '{"subscribe":true}']);
+  p.stdout.on("data", onChange);
   p.on("error", function() {});
-  p.on("exit", function() { setTimeout(runningWatcher, 5000); });
+  p.on("exit", function() {
+    var i = extraProcs.indexOf(p);
+    if (i !== -1) extraProcs.splice(i, 1);
+    setTimeout(function() { subscribe(uri, onChange); }, 5000);
+  });
   extraProcs.push(p);
+}
+function runningWatcher() {
+  subscribe("luna://com.webos.applicationManager/running", appsChanged);
+}
+
+// ---- ingångarna ----
+// Vilka HDMI-ingångar som har något anslutet, så att hemskärmen kan dölja tomma ingångar.
+var INPUTS_JS = path.join(HOME_DIR, "ingangar.js");
+function writeInputs() {
+  luna("luna://com.webos.service.eim/getAllInputStatus", {}, 5000, function(err, out) {
+    var data = parseJson(out);
+    if (!data || !data.devices) return;
+    var list = [];
+    data.devices.forEach(function(d) {
+      var m = /^HDMI_(\d+)$/.exec(d.id || "");
+      if (m) list.push({ id: "com.webos.app.hdmi" + m[1], namn: d.label || "HDMI " + m[1], ansluten: d.connected === true });
+    });
+    try { writeAtomic(INPUTS_JS, "window.TV_INGANGAR = " + JSON.stringify(list) + ";\n"); } catch (e) {}
+  });
+}
+var inputsTimer = null;
+function inputsWatcher() {
+  writeInputs();
+  subscribe("luna://com.webos.service.eim/getAllInputStatus", function() {
+    clearTimeout(inputsTimer);
+    inputsTimer = setTimeout(writeInputs, 1000);
+  });
 }
 
 function setupLg() {
@@ -455,12 +494,16 @@ function homekeyWatcher() {
   watchKeys(function(file, code) {
     if (readCodes().indexOf(code) === -1) return;
     if (!lgHomePatched) return launchHome("Home-knappen");
-    // Den ändrade LG-hemraden startar Hemskärm själv; kliv bara in om den inte syns.
+    // Den ändrade LG-hemraden startar Hemskärm själv; kliv bara in om ingen app syns. Det händer ibland
+    // när Hemskärm redan var framme: LG:s rad döljs men fokus kommer inte tillbaka. Ta då bara fram
+    // Hemskärm igen (utan att stänga den), så att inga knapptryck försvinner medan sidan laddar om.
     setTimeout(function() {
       foregroundApp(function(fg) {
-        if (fg === "" || fg === "com.webos.app.home") launchHome("Home-knappen, reserv");
+        if (fg !== "" && fg !== "com.webos.app.home") return;
+        log("tar fram hemskärmen (Home-knappen, reserv)");
+        luna("luna://com.webos.applicationManager/launch", { id: APP_ID, params: { hem: true } }, 5000);
       });
-    }, 2500);
+    }, 1800);
   });
 }
 
@@ -569,6 +612,8 @@ function cleanSettings(s) {
     });
   }
   if (typeof s.bakgrund === "string" && /^[a-z0-9\-]{1,20}$/.test(s.bakgrund)) out.bakgrund = s.bakgrund;
+  if (typeof s.doljTomma === "boolean") out.doljTomma = s.doljTomma;
+  if (typeof s.vaxlaBakgrund === "boolean") out.vaxlaBakgrund = s.vaxlaBakgrund;
   if (s.snabbstart instanceof Array) {
     out.snabbstart = s.snabbstart.filter(function(id) {
       return typeof id === "string" && /^[\w.\-]{1,100}$/.test(id);
@@ -601,6 +646,73 @@ function saveSettings(b64) {
   });
 }
 
+// ---- bakgrund från mobilen ----
+// Menyn (Bakgrund → Ladda upp från mobilen) kör "hem uppladdning" via Homebrew Channels exec. Det startar
+// en egen liten webbserver i bakgrunden med en slumpad, hemlig adress som visas som QR-kod på TV:n.
+// Servern tar emot en enda JPEG (beskuren på mobilen), sparar den som bakgrund.jpg och slutar sedan,
+// eller efter 10 minuter. Hemskärmen följer förloppet i uppladdning.js.
+var UPLOAD_PORT = 8899;
+var UPLOAD_JS = path.join(HOME_DIR, "uppladdning.js");
+var UPLOAD_PID = "/tmp/hemskarm-uppladdning.pid";
+
+function stopUploadServer() {
+  try { process.kill(+fs.readFileSync(UPLOAD_PID, "utf8"), "SIGTERM"); } catch (e) {}
+  try { fs.unlinkSync(UPLOAD_PID); } catch (e) {}
+}
+function tvAddress() {
+  var nets = require("os").networkInterfaces(), ip = null;
+  Object.keys(nets).forEach(function(name) {
+    nets[name].forEach(function(a) { if (!ip && a.family === "IPv4" && !a.internal) ip = a.address; });
+  });
+  return ip;
+}
+function startUpload() {
+  stopUploadServer();
+  var ip = tvAddress();
+  if (!ip) { console.log(JSON.stringify({ fel: "TV:n har ingen nätverksadress" })); process.exit(1); }
+  var token = require("crypto").randomBytes(6).toString("hex");
+  childProcess.spawn(process.execPath, [__filename, "uppladdningsserver", token],
+    { detached: true, stdio: ["ignore", "ignore", "ignore"] }).unref();
+  console.log(JSON.stringify({ url: "http://" + ip + ":" + UPLOAD_PORT + "/" + token }));
+  process.exit(0);
+}
+function uploadServer(token) {
+  var http = require("http"), base = "/" + token;
+  function status(s) { try { writeAtomic(UPLOAD_JS, "window.TV_UPPLADDNING = " + JSON.stringify({ status: s, tid: Date.now() }) + ";\n"); } catch (e) {} }
+  function quit() { try { fs.unlinkSync(UPLOAD_PID); } catch (e) {} process.exit(0); }
+  fs.writeFileSync(UPLOAD_PID, String(process.pid));
+  process.on("SIGTERM", quit);
+  var server = http.createServer(function(req, res) {
+    if (req.method === "GET" && (req.url === base || req.url === base + "/")) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(fs.readFileSync(path.join(__dirname, "uppladdning.html")));
+    }
+    if (req.method !== "POST" || req.url !== base + "/bild") { res.writeHead(404); return res.end(); }
+    var chunks = [], size = 0, tooBig = false;
+    status("tar emot");
+    req.on("data", function(c) {
+      size += c.length;
+      if (size > 15 * 1024 * 1024) { tooBig = true; req.destroy(); } else chunks.push(c);
+    });
+    req.on("end", function() {
+      var img = Buffer.concat(chunks);
+      if (tooBig || img.length < 1000 || img[0] !== 0xff || img[1] !== 0xd8) {
+        status("fel");
+        res.writeHead(400);
+        return res.end("Bilden måste vara en JPEG under 15 MB");
+      }
+      writeAtomic(BG_JPG, img);
+      writeAtomic(BG_JS, "window.TV_BAKGRUND = " + JSON.stringify(dataUrl(BG_JPG)) + ";\n");
+      status("klar");
+      res.end("OK");
+      setTimeout(quit, 3000);
+    });
+  });
+  server.on("error", function() { status("fel"); quit(); });
+  server.listen(UPLOAD_PORT, function() { status("vantar"); });
+  setTimeout(function() { status("stangd"); quit(); }, 10 * 60 * 1000);
+}
+
 // En uppdatering via Homebrew Channel byter ut den här filen. Starta då om tjänsten
 // med den nya versionen, så att ingen behöver köra setup.sh igen.
 function watchSelf() {
@@ -631,6 +743,11 @@ function main() {
       console.log(ok ? "Väder för " + w.ort + ": " + w.temp + "°" : "Kunde inte hämta vädret");
       process.exit(ok ? 0 : 1);
     });
+  } else if (cmd === "uppladdning") {
+    if (process.argv[3] === "stopp") { stopUploadServer(); console.log("OK"); process.exit(0); }
+    startUpload();
+  } else if (cmd === "uppladdningsserver") {
+    uploadServer(process.argv[3]);
   } else if (cmd === "spara") {
     saveSettings(process.argv[3]);
   } else if (cmd === "run") {
@@ -640,12 +757,13 @@ function main() {
     refreshApps();
     refreshWeather();
     refreshBackground();
+    inputsWatcher();
     if (!process.env.CUSTOMHOME_DIR) setupLg();
     setInterval(refreshWeather, 30 * 60 * 1000);
     setInterval(refreshBackground, 15000);
     watchSelf();
   } else {
-    console.log("Användning: node customhome.js run|learn|apps|weather|spara");
+    console.log("Användning: node customhome.js run|learn|apps|weather|spara|uppladdning");
     process.exit(2);
   }
 }

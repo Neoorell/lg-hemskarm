@@ -71,14 +71,27 @@ visas i 4K när innehållet finns i 4K, eftersom videon har ett eget lager.
 Markera **kugghjulet** sist bland ingångarna och tryck OK, eller tryck på **gula knappen** på
 fjärrkontrollen. Där kan du:
 - **Appar på raden:** OK lägger till eller tar bort en app, ◀ ▶ flyttar den.
+- **Ingångar:** tomma ingångar (inget anslutet) döljs automatiskt; det går att stänga av.
 - **Ingångar:** visa eller dölj HDMI 1–3 och byt namn, t.ex. till "PlayStation".
-- **Bakgrund:** välj bland några foton, bara stjärnhimmel eller din egen bild.
+- **Bakgrund:** välj bland några foton, bara stjärnhimmel eller din egen bild. **Växla bakgrund** byter
+  bild var 15:e minut. **Ladda upp från mobilen** visar en QR-kod (se nedan).
 - **Väder:** välj ort i listan eller sök efter en annan.
 - **Snabbstart:** välj upp till två appar som förladdas, så att de öppnas direkt (TV4 Play från början).
+- **Ljud ut:** TV-högtalare, soundbar (HDMI ARC), optisk eller Bluetooth.
+- **Bild-, ljud- och nätverksinställningar** och **allmänna TV-inställningar:** öppnar TV:ns egna
+  inställningar direkt på rätt sida.
 - **Uppdateringar:** se om en ny version finns och installera den direkt.
 
 **BACK** går tillbaka ett steg. Ändringarna sparas när du stänger menyn, och hemskärmen laddas om.
 BACK en gång på själva hemskärmen gör ingenting, så du hamnar inte i LG:s gamla meny av misstag.
+
+## Hemskärmen
+
+- **Håll OK** på en app på raden för att ändra den: **◀ ▶** flyttar, **▼** tar bort, **OK** klar.
+- **Alla appar** sist i raden visar alla appar på TV:n. **OK** öppnar, **gula knappen** lägger till
+  eller tar bort appen från raden.
+- TV4 Play tar ungefär 20 sekunder att starta från början (TV4-appen är tung); under tiden syns
+  TV4:s startbild. Med **Snabbstart** öppnas den direkt.
 
 ## Appar som körs (BACK två gånger)
 
@@ -99,16 +112,20 @@ Du behöver **inte** köra `setup.sh` igen.
 
 Din bakgrundsbild, väderort, dina inställningar och HOME-knappens kod finns kvar efter en uppdatering.
 
-## Egen bakgrundsbild (på Macen)
+## Egen bakgrundsbild
 
-Välj en bild, helst liggande och ungefär 1920×1080, lägg den i **Dokument** och skicka den till TV:n
-(mappen Dokument heter `~/Documents` i Terminal):
+**Enklast, från mobilen:** Inställningar → Bakgrund → **Ladda upp från mobilen**. Skanna QR-koden med
+mobilens kamera (mobilen ska vara på samma wifi), välj ett foto, flytta och zooma det så att rätt del
+syns och tryck **Spara på TV:n**. TV:n byter till bilden direkt. Sidan på TV:n är öppen i högst
+10 minuter och tar emot en bild.
+
+**Från Macen** (Terminal), om du hellre vill: lägg bilden i **Dokument** och kör
 
 ```sh
 cat ~/Documents/minbild.jpg | ssh root@192.168.0.222 'cat > /media/developer/custom_home/bakgrund.jpg'
 ```
 
-Vänta cirka 15 sekunder (bakgrundstjänsten läser in bilden) och tryck HOME så syns den. Bilden måste vara en **.jpg** och heta exakt `bakgrund.jpg` på TV:n.
+Vänta cirka 15 sekunder och tryck HOME. Bilden måste vara en **.jpg**, helst 1920×1080.
 Välj den under **Inställningar → Bakgrund → Egen bild** om ett annat foto är valt.
 Ta bort den med `rm /media/developer/custom_home/bakgrund.jpg` på TV:n.
 

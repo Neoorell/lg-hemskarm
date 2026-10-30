@@ -18,8 +18,8 @@
   .fill { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
 
   #sky { background: radial-gradient(ellipse at 30% 110%, #2a2440 0%, rgba(42,36,64,0) 60%), linear-gradient(180deg, #05060c 0%, #0b1022 55%, #1a1f33 100%); }
-  #photo { background-size: cover; background-position: center; opacity: 0; transition: opacity 1.2s ease; }
-  #photo.loaded { opacity: 1; }
+  .photo { background-size: cover; background-position: center; opacity: 0; transition: opacity 1.2s ease; }
+  .photo.loaded { opacity: 1; }
   #dim { background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 32%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.85) 100%); }
 
   /* ---- överst: klocka och väder ---- */
@@ -41,22 +41,40 @@
   .row { display: flex; overflow: hidden; padding: 26px 84px 20px; }
   .row > * { flex-shrink: 0; margin-right: 28px; }
 
-  /* app-ruta: lyfts när den är markerad, namnet syns bara då (som på Apple TV) */
+  /* app-ruta: lyfts när den är markerad, namnet syns bara då (som på Apple TV).
+     Bara transform och opacity animeras: skuggor och ramfärger måste TV:ns Chromium 53 rita om
+     för varje bildruta, medan flytt och toning sköts av grafikkretsen. */
   .app { width: 220px; text-align: center; }
   .tile {
     width: 220px; height: 132px; border-radius: 22px; position: relative; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-    transition: transform .22s ease, box-shadow .22s ease;
+    transition: transform .2s ease; will-change: transform;
   }
+  /* ljusskimmer upptill och vit ram, tonas in när rutan markeras */
   .tile:after {
-    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 55%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0));
-    opacity: 0; transition: opacity .22s ease;
+    content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 22px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 55%);
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,0.85);
+    opacity: 0; transition: opacity .2s ease;
   }
-  .focused .tile { transform: translateY(-8px) scale(1.14); box-shadow: 0 28px 50px rgba(0,0,0,0.6), 0 0 0 3px rgba(255,255,255,0.85); }
+  .focused .tile { transform: translateY(-8px) scale(1.14); }
   .focused .tile:after { opacity: 1; }
   .app.missing .tile { opacity: 0.4; }
+  /* redigering (håll OK): rutan gungar, och en borttagen ruta glider uppåt och tonas bort */
+  .app { transition: opacity .25s ease, transform .25s ease; }
+  .app.removing { opacity: 0; transform: translateY(-40px); }
+  .app.editing .tile { animation: gunga .22s ease-in-out infinite alternate; }
+  @keyframes gunga {
+    from { transform: translateY(-8px) scale(1.14) rotate(-2deg); }
+    to { transform: translateY(-8px) scale(1.14) rotate(2deg); }
+  }
+  #edit-hint {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: none;
+    background: rgba(0,0,0,0.82); padding: 12px 28px; border-radius: 14px; font-size: 21px; color: rgba(255,255,255,0.8);
+  }
+  #edit-hint.show { display: block; }
+  #edit-hint b { color: #fff; }
   .app-name { margin-top: 26px; font-size: 22px; font-weight: 600; opacity: 0; transition: opacity .2s ease; text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
   .app.focused .app-name { opacity: 1; }
 
@@ -71,7 +89,7 @@
     height: 76px; padding: 0 30px 0 22px; border-radius: 38px;
     display: flex; align-items: center;
     background: rgba(20,22,30,0.55); border: 2px solid rgba(255,255,255,0.18);
-    transition: transform .22s ease, background .22s ease, border-color .22s ease;
+    transition: transform .2s ease; will-change: transform;
   }
   .input svg { width: 40px; height: 40px; margin-right: 14px; }
   .input-name { font-size: 24px; font-weight: 600; }
@@ -110,6 +128,11 @@
   .m-row input { font: inherit; font-size: 24px; width: 420px; padding: 8px 14px; border-radius: 10px; border: 2px solid #111; }
   .m-hint { position: absolute; left: 50px; right: 50px; bottom: 34px; font-size: 19px; color: rgba(255,255,255,0.55); }
   .m-hint b { color: #fff; font-weight: 600; }
+  .m-upload { display: flex; align-items: center; padding: 30px 22px; }
+  .m-upload canvas { width: 320px; height: 320px; border-radius: 16px; flex-shrink: 0; }
+  .m-upload-text { margin-left: 46px; }
+  .m-upload-url { font-size: 30px; font-weight: 600; word-break: break-all; }
+  .m-upload-status { margin-top: 18px; font-size: 26px; color: #2ed573; }
 
   /* ---- applistan (BACK två gånger): samma panel som menyn ---- */
   #vaxlare { background: rgba(0,0,0,0.72); display: none; }
@@ -120,6 +143,16 @@
   .m-row.danger.focused { background: #ff4757; }
   .m-row.danger.focused .m-label { color: #fff; }
   .v-empty { position: absolute; top: 160px; left: 50px; font-size: 26px; color: rgba(255,255,255,0.7); display: none; }
+
+  /* ---- alla appar (rutan sist i appraden) ---- */
+  #allaappar { background: rgba(5,6,12,0.94); display: none; }
+  #allaappar.show { display: block; }
+  .g-title { position: absolute; top: 70px; left: 120px; font-size: 48px; font-weight: 600; }
+  #g-grid { position: absolute; top: 160px; bottom: 110px; left: 0; right: 0; padding: 30px 120px 0; overflow: hidden; display: flex; flex-wrap: wrap; align-content: flex-start; }
+  .g-app { position: relative; height: 184px; margin: 0 34px 30px 0; }
+  .g-mark { position: absolute; top: 8px; right: 8px; padding: 3px 10px; border-radius: 10px; font-size: 15px; font-weight: 600; background: rgba(0,0,0,0.6); }
+  .g-hint { position: absolute; left: 120px; bottom: 50px; font-size: 22px; color: rgba(255,255,255,0.55); }
+  .g-hint b { color: #fff; font-weight: 600; }
 
   #toast {
     position: absolute; left: 50%; top: 64px; transform: translateX(-50%);
@@ -136,11 +169,13 @@
 <script src="file:///media/developer/custom_home/weather.js"></script>
 <!-- Det som ändras i hemskärmens meny (kugghjulet eller gula knappen) -->
 <script src="file:///media/developer/custom_home/installningar.js"></script>
+<!-- Vilka HDMI-ingångar som har något anslutet (skrivs av bakgrundstjänsten) -->
+<script src="file:///media/developer/custom_home/ingangar.js"></script>
 </head>
 <body>
   <div id="sky" class="fill"></div>
   <canvas id="stars" class="fill"></canvas>
-  <div id="photo" class="fill"></div>
+  <div id="photo" class="fill photo"></div>
   <div id="dim" class="fill"></div>
 
   <div class="clock">
@@ -170,6 +205,12 @@
       <div class="m-hint" id="v-hint"></div>
     </div>
   </div>
+  <div id="allaappar" class="fill">
+    <div class="g-title">Alla appar</div>
+    <div id="g-grid"></div>
+    <div class="g-hint"><b>OK</b> öppna · <b>Gul knapp</b> lägg till eller ta bort på raden · <b>BACK</b> tillbaka</div>
+  </div>
+  <div id="edit-hint"><b>◀ ▶</b> flytta · <b>▼</b> ta bort från raden · <b>OK</b> klar</div>
   <div id="toast"></div>
 
 <script>
@@ -206,7 +247,7 @@
   var INGANGAR = [
     { namn: "HDMI 1", id: "com.webos.app.hdmi1" },
     { namn: "HDMI 2", id: "com.webos.app.hdmi2" },
-    { namn: "HDMI 3", id: "com.webos.app.hdmi3", dold: true }
+    { namn: "HDMI 3", id: "com.webos.app.hdmi3" }
   ];
 
   // =====================================================================
@@ -239,7 +280,12 @@
     '<rect width="32" height="32" fill="#0779ff" paint-order="stroke fill markers"/>' +
     '<path d="M14.7858 28.623c-2.2778-.1804-4.0662-.654-5.8212-1.5414-1.1972-.6054-1.9656-1.151-2.794-1.984-.6461-.6497-.9695-1.0786-1.0354-1.3731-.0539-.2405.0438-.3877.2573-.3877.1385 0 .3681.132.7585.4358 1.7029 1.3256 4.0807 2.2867 6.7193 2.716 2.4595.4 4.9596.351 7.4985-.147.829-.1626 1.561-.3539 2.3134-.6042.5662-.1885.9335-.34 1.51-.623.3821-.1877.4981-.2329.6226-.2424.1456-.0111.157-.0076.2348.0779.1203.1316.1159.2992-.013.4932-.1191.1796-.333.3933-.6431.6428-1.6106 1.2957-4.227 2.2257-7.0314 2.4993-.5025.049-2.1335.073-2.5763.0379zM25.31 27.094c-.1597-.1401-.1323-.294.1294-.728.3494-.5792.6425-1.2774.7158-1.7053.0616-.359-.0287-.4746-.4257-.545-.3728-.066-1.2411-.0198-1.7872.095-.1007.0212-.2829.0385-.4048.0385-.1993 0-.2278-.0067-.2822-.0645-.0333-.0354-.067-.112-.0748-.1701-.0122-.0916-.0025-.119.074-.2061.1218-.1386.3575-.2935.6792-.4461.5587-.2651 1.0496-.3746 1.6788-.3744.812.0002 1.461.1955 1.678.505.0796.1135.0814.1233.091.4967.0071.2772-.0023.4466-.0349.6221-.1065.5746-.4042 1.2376-.7466 1.6627-.2225.2763-.7182.73-.8927.817-.2024.1012-.2843.1017-.3973.003zm-11.4332-5.962c-.672-.1285-1.2398-.808-1.4655-1.7537-.1545-.6472-.1647-1.5821-.0243-2.2342.1858-.8634.6042-1.4902 1.171-1.7541.7213-.3358 1.4706-.1278 1.9156.5316.0733.1086.1448.1905.1588.1818.0155-.0096.0255-.4887.0255-1.2219 0-1.1803.001-1.2072.055-1.261.0529-.053.08-.0548.683-.047.4566.0056.6372.0171.6615.0415.0617.0618.0697.6112.0575 3.9653l-.012 3.3278-.0563.0604c-.0544.0585-.0721.0604-.5592.0604-.2767 0-.5226-.0076-.5465-.0167-.072-.0276-.1137-.142-.1778-.4869-.0335-.1806-.0679-.3283-.0764-.3283-.0085 0-.051.0694-.0944.1543-.1172.2286-.4363.534-.6872.6576-.1114.055-.267.112-.3458.127-.1716.0325-.502.0307-.6825-.0038zm1.1773-1.2712c.4351-.2107.6684-.9124.62-1.8646-.044-.863-.2991-1.3672-.7542-1.4904-.1502-.0406-.1966-.043-.3201-.0152-.4332.0969-.6774.4909-.7665 1.2365-.0552.462-.0235 1.003.0814 1.3909.105.3882.2826.639.5355.7562.1534.071.4428.0647.6039-.0133zm4.7904 1.264c-.2654-.056-.453-.1264-.6767-.2544-.6454-.3693-1.102-1.0849-1.2439-1.9494-.058-.3537-.058-1.0127 0-1.3664.1365-.8321.5897-1.5798 1.1947-1.9708.3178-.2054.8209-.3518 1.209-.3518.225 0 .5954.071.8151.1563.533.207 1.0047.702 1.2718 1.3346.1795.425.2533.821.2579 1.3842.003.3777-.0017.4253-.0477.4764-.051.0566-.056.0568-1.6304.0568h-1.5792v.0916c0 .164.0752.4899.1602.6941.1026.2465.2328.4024.413.4949.1884.0966.499.1003.709.0086.169-.0739.3603-.2745.4175-.4378.0217-.0623.0563-.1616.0766-.2207.033-.0952.0479-.1082.1324-.1154.1196-.01 1.0882.2 1.174.2548.0883.0563.068.178-.083.4955-.151.3178-.3942.6236-.6443.8104-.4167.3112-.7572.4211-1.349.4354-.2726.0067-.4589-.0019-.577-.027zm1.3113-3.4752c.0288-.0178.027-.0653-.0095-.2602-.0885-.473-.2755-.7918-.5355-.9129-.3983-.1855-.8453.0532-1.0367.5536-.089.2326-.1584.5803-.123.6157.0351.035 1.6482.0387 1.7047.0038zm4.0347 3.4726c-.668-.1526-1.2758-.6575-1.6276-1.3517-.1168-.2307-.2563-.6905-.2977-.982-.1625-1.1424.1616-2.2463.8516-2.9012.3602-.342.6845-.5177 1.1152-.6043 1.516-.305 2.8188.9341 2.8976 2.756.033.7608-.1514 1.4852-.5197 2.0418-.308.4654-.7933.8363-1.311 1.002-.2426.0775-.8475.099-1.1084.0394zm.8131-1.214c.2445-.1267.4312-.4248.5313-.848.0504-.2132.058-.3248.0584-.8493.0003-.4856-.0089-.6432-.0472-.805-.1383-.585-.3708-.8916-.733-.9668-.4736-.0983-.851.2559-.9901.9294-.1685.8158-.0675 1.8239.2274 2.2691.0832.1256.2755.2802.3978.3197.1236.04.4369.0123.5554-.0491zM5.8782 20.9777c-.0524-.0578-.0783-.1364-.2439-.7406a204.9529 204.9529 0 0 0-.2682-.9661 208.1657 208.1657 0 0 1-.4023-1.4492 239.7715 239.7715 0 0 0-.512-1.8412c-.0655-.2304-.119-.444-.119-.4749 0-.1261.0722-.1395.7544-.1395.5697 0 .6412.0048.6943.048.0499.0403.0923.1977.2693.9996.212.9602.2816 1.273.376 1.6898.137.6047.2944 1.3462.2944 1.3873 0 .0841.044-.002.0778-.1528.0347-.1543.1056-.4772.4424-2.0128.3557-1.6223.412-1.856.4575-1.9017.0378-.0379.1328-.045.6804-.051.6825-.0076.7625.0048.7793.122.0075.0525-.085.3994-.4942 1.8524a393.9247 393.9247 0 0 0-.5782 2.0984c-.0932.3421-.1636.5897-.3752 1.3207-.0286.099-.0707.1986-.0935.2214-.0354.0354-.159.0413-.8672.0413-.7781 0-.8285-.0029-.8722-.0511zm4.1875-.0048-.0711-.056.0071-2.7207c.0067-2.5696.0097-2.7235.055-2.7687.0425-.0426.1143-.0488.6493-.056.5067-.0067.6145-.002.6835.0342l.082.0423v2.7086c0 1.9448-.0086 2.7273-.0302 2.7747-.0166.0364-.0558.073-.0872.0814-.0314.0086-.3182.0156-.6372.0157-.5475.0003-.5841-.0029-.6512-.0555zm.4216-6.0333c-.2383-.0616-.477-.285-.5561-.5204-.0543-.1614-.0554-.4244-.0027-.6021.0484-.163.2378-.3861.3992-.4702.1678-.0873.5799-.1004.7528-.0238.2007.0887.3263.2048.416.3845.0738.1475.0821.1892.0816.4083-.0007.2837-.0505.424-.2089.5884-.1589.165-.329.2376-.5812.2482-.1186.0048-.254-.0008-.3007-.013zm-6.3827-1.3908a.2899.2899 0 0 1-.1006-.0547c-.0443-.0393-.047-.2465-.0466-3.6404.0002-1.9793.0093-3.612.0201-3.6282.0512-.0767.1504-.0912.6196-.0912.2655 0 .5021.0076.5259.0165.0673.0259.0917.0922.1635.4449.0368.1806.076.3374.087.3484.011.011.0556-.049.0991-.1332.0936-.1813.3767-.4753.561-.5827.3221-.1876.6802-.2586 1.0303-.2041.8145.1266 1.3815.8216 1.6334 2.0022.0627.2936.0792 1.2937.0277 1.6773-.0912.6796-.3508 1.3098-.6885 1.6715-.3439.3682-.656.5237-1.1006.5481-.3188.0175-.5242-.0196-.766-.1383-.217-.1066-.466-.3395-.6223-.582-.0556-.0864-.1102-.157-.1213-.1572-.011-.0001-.02.5243-.02 1.1654 0 .6524-.011 1.1945-.025 1.2312-.0406.1068-.1526.1261-.7104.1227-.282-.0019-.5368-.0086-.5663-.0162zm2.4707-2.8972c.1947-.0663.383-.2667.4874-.5186.1185-.286.1712-.5725.1877-1.0198.0287-.7791-.1484-1.4474-.451-1.702-.0966-.0813-.3467-.1766-.4635-.1766-.5822 0-.9571.6662-.9563 1.6994.0006.7365.1469 1.263.4295 1.5457.2025.2025.4883.2666.7662.1719zm19.2198 1.2532c-.9286-.1678-1.6543-.8886-1.9088-1.8962-.3432-1.3585.0316-2.7882.918-3.502.837-.674 2.0391-.6726 2.8057.0038.3352.2955.5295.5755.7155 1.0309.154.3772.2159.6988.2333 1.2146.0081.2387.0071.4643-.0022.5013-.0399.159.0418.1516-1.6676.1516-.8616 0-1.573.0104-1.5808.023-.029.047.0683.5245.1503.737.108.2802.3095.4965.5184.5566.4544.1308.8854-.0736 1.0306-.4889.0995-.2842.1133-.3034.2252-.3128.0839-.0067.6994.115 1.0735.2126.1559.0407.1706.1146.073.3674-.1135.2936-.256.5247-.4535.7356-.4387.4683-.9101.6657-1.6268.681-.2066.0048-.4333-.0019-.5038-.0151zm1.2687-3.5442c0-.271-.1724-.7676-.3319-.9562-.1098-.13-.3202-.2237-.4986-.2223-.2844.0019-.5005.1345-.6575.4025-.103.1757-.2176.5125-.2452.7208l-.0182.1368h1.7514zM9.531 11.7426l-.0725-.057V8.9535c0-2.5066.0036-2.7352.0443-2.769.0593-.0493 1.0006-.0686 1.1112-.0228.0932.0386.1183.1011.188.469.0308.1624.0642.3038.0744.3143.0101.0104.0604-.062.1118-.161.1138-.2195.3915-.5093.579-.604.3128-.158.77-.1998 1.1207-.1026.2217.0614.3131.1385.3131.264 0 .0898-.1788.8432-.2582 1.088-.0604.186-.0992.1964-.364.0973-.3125-.117-.4712-.1573-.6205-.1576-.4033-.001-.657.2112-.788.6592-.0412.1411-.0481.3571-.0612 1.9222-.0117 1.394-.0221 1.7705-.0496 1.798-.026.0261-.1894.037-.6455.043-.5881.0076-.6133.0057-.683-.049zm3.9635.028c-.0311-.0126-.0637-.0414-.0724-.0641-.0116-.0303-.0296-4.92-.02-5.4173.0027-.1377.0875-.155.7608-.155.6647 0 .679.0038.6903.1744.0029.0444.004 1.2731.0025 2.7307-.003 2.6125-.0036 2.651-.0565 2.7039-.0506.0506-.0883.0535-.6508.0519-.3285-.001-.6227-.012-.6538-.0246zm2.3576-.002c-.0335-.0133-.0727-.0557-.0873-.0939-.0167-.044-.0264-1.0531-.0264-2.7464 0-2.2687.0058-2.6848.038-2.729.035-.0478.0803-.0528.552-.0613.3476-.0066.538.0008.5887.0218.0809.0335.0908.0625.1864.5434.0256.1287.0542.2416.0636.251.0094.0095.0594-.0669.111-.1695.1685-.3344.446-.5852.7839-.7086.126-.046.2226-.0585.4675-.0605.3287-.0028.4604.027.7378.166.1812.0907.4652.3819.5883.603.0555.0997.1089.1809.1187.1805.0098-.0004.0565-.0577.1038-.1275.2485-.3665.6096-.6551.956-.764.272-.0855.707-.0843.9625.0029.5491.1867.8732.5958 1.0752 1.3572.056.2108.0578.2728.0668 2.2296.008 1.7344.0038 2.0202-.03 2.0665-.037.0505-.0755.0542-.6528.062-.5888.0087-.6165.0068-.685-.0477l-.0715-.056-.009-1.8176c-.0089-1.7914-.0099-1.82-.0683-1.9942-.1205-.3592-.3173-.5165-.6503-.5194-.3369-.0029-.5748.1788-.7.5351-.0893.254-.1047.5782-.1049 2.2074-.0002 1.5542-.0014 1.5913-.0539 1.6438-.0504.0504-.0894.0536-.6458.0536-.6052 0-.6706-.0097-.723-.1076-.0189-.0353-.028-.6098-.0275-1.737.0007-1.6872-.0085-1.8915-.0976-2.1651-.1262-.3872-.5996-.5531-.9828-.3446-.245.1334-.375.408-.4223.8923-.0136.1402-.0251.952-.0255 1.8038l-.0007 1.5488-.0588.0547c-.0555.0516-.0909.0546-.6374.053-.3182-.001-.606-.0127-.6394-.0262zm-1.9655-6.0624c-.2343-.0715-.442-.2525-.5411-.4714-.0859-.1896-.0857-.533.0005-.7272.076-.1714.2453-.3392.4199-.4164.1911-.0845.5338-.0834.7318.0028.1939.084.3845.2958.448.4977.0645.2049.0447.492-.0478.694-.081.177-.2817.346-.4811.4052-.1437.0426-.4155.0507-.5302.0157z" fill="#fff"/>' +
     '</svg></div>';
-  var LOGOS = { NETFLIX: NETFLIX_SVG, YT: YT_SVG, PRIME: PRIME_SVG };
+  var ALLA_SVG = '<div class="icon60"><svg viewBox="0 0 60 60" fill="#fff">' +
+    '<rect x="4" y="4" width="14" height="14" rx="4"/><rect x="23" y="4" width="14" height="14" rx="4"/><rect x="42" y="4" width="14" height="14" rx="4"/>' +
+    '<rect x="4" y="23" width="14" height="14" rx="4"/><rect x="23" y="23" width="14" height="14" rx="4"/><rect x="42" y="23" width="14" height="14" rx="4"/>' +
+    '<rect x="4" y="42" width="14" height="14" rx="4"/><rect x="23" y="42" width="14" height="14" rx="4"/><rect x="42" y="42" width="14" height="14" rx="4"/>' +
+    '</svg></div>';
+  var LOGOS = { NETFLIX: NETFLIX_SVG, YT: YT_SVG, PRIME: PRIME_SVG, ALLA: ALLA_SVG };
   var HDMI_SVG = '<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">' +
     '<path d="M5 16h38v9l-5 7H10l-5-7z"/><path d="M13 22h22"/></svg>';
   var GEAR_SVG = '<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">' +
@@ -259,16 +305,24 @@
       ctx.fill();
     }
   }
-  var bgToken = 0;
+  // En ny bild tonas in i ett eget lager ovanpå den gamla, som tas bort efteråt.
+  function showPhoto(url) {
+    var old = document.getElementById("photo");
+    var p = document.createElement("div");
+    p.className = "fill photo";
+    p.style.backgroundImage = "url('" + url + "')";
+    old.parentNode.insertBefore(p, old.nextSibling);
+    old.id = "";
+    p.id = "photo";
+    p.offsetWidth; // rita lagret osynligt först, annars blir det ingen övertoning
+    p.className = "fill photo loaded";
+    setTimeout(function() { if (old.parentNode) old.parentNode.removeChild(old); }, 1400);
+  }
+  var bgToken = 0, bgShown = null;
   function loadBackground(sources, token) {
     if (!sources.length || token !== bgToken) return;
     var img = new Image();
-    img.onload = function() {
-      if (token !== bgToken) return;
-      var p = document.getElementById("photo");
-      p.style.backgroundImage = "url('" + sources[0] + "')";
-      p.className = "fill loaded";
-    };
+    img.onload = function() { if (token === bgToken) showPhoto(sources[0]); };
     img.onerror = function() { loadBackground(sources.slice(1), token); };
     img.src = sources[0];
   }
@@ -281,13 +335,27 @@
     return src;
   }
   function setBackground(id) {
-    var p = document.getElementById("photo");
-    p.className = "fill";
+    if (id === bgShown) return;
+    bgShown = id;
     bgToken++;
-    loadBackground(bakgrundKallor(id), bgToken);
+    if (id === "stjarnor") document.getElementById("photo").className = "fill photo";
+    else loadBackground(bakgrundKallor(id), bgToken);
   }
+
+  // Växlande bakgrunder (menyn): alla foton och den egna bilden i tur och ordning, en ny var 15:e minut.
+  // Valet räknas ut från klockan, så det blir samma bild även om sidan laddas om.
+  function rotationList() {
+    return (window.TV_BAKGRUND ? ["egen"] : []).concat(BAKGRUNDER.filter(function(b) { return b.url; })
+      .map(function(b) { return b.id; }));
+  }
+  function rotatingId() {
+    var list = rotationList();
+    return list[Math.floor(Date.now() / (15 * 60 * 1000)) % list.length];
+  }
+  function currentBackground() { return INST.vaxlaBakgrund ? rotatingId() : bakgrundId(); }
   drawStars();
-  setBackground(bakgrundId());
+  setBackground(currentBackground());
+  setInterval(function() { if (INST.vaxlaBakgrund) setBackground(rotatingId()); }, 60 * 1000);
 
   // ---- klocka ----
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
@@ -347,6 +415,29 @@
     }
   }
 
+  // Sparar ändrade inställningar: tjänstens "hem spara <base64-JSON>" körs som root av Homebrew
+  // Channels exec (sidan kan inte skriva filer själv). INST uppdateras när det lyckats.
+  var saveBridge = null;
+  function saveInst(changes, cb) {
+    var out = JSON.parse(JSON.stringify(INST)), k;
+    for (k in changes) out[k] = changes[k];
+    var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(out))));
+    try {
+      saveBridge = new PalmServiceBridge();
+      saveBridge.onservicecallback = function(msg) {
+        var r = null;
+        try { r = JSON.parse(msg); } catch (e) {}
+        var ok = !!(r && r.returnValue && /OK/.test(r.stdoutString || ""));
+        if (ok) for (k in changes) INST[k] = changes[k];
+        cb(ok);
+      };
+      saveBridge.call("luna://org.webosbrew.hbchannel.service/exec",
+        JSON.stringify({ command: "sh /media/developer/custom_home/hem spara " + b64 }));
+    } catch (e) {
+      cb(false);
+    }
+  }
+
   var toastTimer = null;
   function toast(msg) {
     var t = document.getElementById("toast");
@@ -356,9 +447,15 @@
     toastTimer = setTimeout(function() { t.className = ""; }, 2500);
   }
 
+  // När Hemskärm har öppnat en app startar TV:ns fönsterhanterare om Hemskärm i bakgrunden en
+  // stund senare. appinfo.json har därför handlesRelaunch, så att webbmotorn inte lyfter fram
+  // Hemskärm då (annars knuffas appen undan, och en långsam app som TV4 Play syns aldrig).
+  var launchedAt = 0;
   function launch(item) {
     if (item.meny) { Meny.open(); return; }
+    if (item.allaAppar) { AllaAppar.open(); return; }
     if (!item.id) { toast(item.namn + " hittades inte på TV:n"); return; }
+    launchedAt = Date.now();
     callLuna("luna://com.webos.applicationManager/launch", { id: item.id }, function(resp) {
       if (resp && resp.returnValue === false) toast("Kunde inte starta " + item.namn);
     });
@@ -420,7 +517,16 @@
     });
   }
   function allInputs() { return INST.ingangar instanceof Array ? INST.ingangar : INGANGAR; }
-  function chosenInputs() { return allInputs().filter(function(i) { return !i.dold; }); }
+  // Tomma ingångar (inget anslutet) döljs, om det inte stängts av i menyn.
+  function inputConnected(id) {
+    var list = window.TV_INGANGAR || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].ansluten;
+    return true;
+  }
+  function chosenInputs() {
+    var hideEmpty = INST.doljTomma !== false;
+    return allInputs().filter(function(i) { return !i.dold && (!hideEmpty || inputConnected(i.id)); });
+  }
 
   // ---- uppdateringar: jämför installerad version med app-källan på GitHub ----
   var UPPDATERING = null, APP_VERSION = null;
@@ -496,6 +602,11 @@
     el.querySelector(".input-name").textContent = item.namn;
     return { el: el, item: item };
   }
+  function makeAllAppsTile() {
+    var t = makeAppTile({ namn: "Alla appar", svg: "ALLA", bg: "rgba(255,255,255,0.14)" });
+    t.item.allaAppar = true;
+    return t;
+  }
   function makeGearTile() {
     var el = document.createElement("div");
     el.className = "input gear";
@@ -517,8 +628,9 @@
     entries.forEach(function(e, idx) {
       e.row = row;
       row.appendChild(e.el);
-      e.el.addEventListener("mouseover", function() { focusAt(gi, idx); });
-      e.el.addEventListener("click", function() { launch(e.item); });
+      // platsen räknas ut vid varje händelse, eftersom rutorna kan flyttas
+      e.el.addEventListener("mouseover", function() { if (!editing) focusAt(gi, groups[gi].indexOf(e)); });
+      e.el.addEventListener("click", function() { if (!editing) launch(e.item); });
     });
     sec.appendChild(lbl);
     sec.appendChild(row);
@@ -526,7 +638,7 @@
   }
 
   function render(tvApps) {
-    var apps = chosenApps(tvApps).map(makeAppTile);
+    var apps = chosenApps(tvApps).map(makeAppTile).concat([makeAllAppsTile()]);
     var inputs = chosenInputs().map(makeInputTile).concat([makeGearTile()]);
     var order = INGANGAR_FORST ? [["Ingångar", inputs], ["Appar", apps]] : [["Appar", apps], ["Ingångar", inputs]];
     var container = document.getElementById("sections");
@@ -556,14 +668,75 @@
     scrollIntoRow(e);
   }
 
+  // ---- redigera raden: håll OK på en app ----
+  // Kort tryck på OK öppnar appen när knappen släpps; håll 0,6 s för att flytta (◀ ▶) eller ta bort (▼)
+  // den. OK eller BACK avslutar och sparar raden.
+  var okTimer = null, editing = false;
+  function appsGroup() { return INGANGAR_FORST ? 1 : 0; }
+  function editable() {
+    var e = groups[curGroup] && groups[curGroup][curIndex];
+    return curGroup === appsGroup() && e && e.item.id && !e.item.allaAppar;
+  }
+  function startEdit() {
+    editing = true;
+    groups[curGroup][curIndex].el.classList.add("editing");
+    document.getElementById("edit-hint").className = "show";
+  }
+  function moveEdit(step) {
+    var g = groups[curGroup], i = curIndex, j = i + step;
+    if (j < 0 || j >= g.length - 1) return; // sist ligger Alla appar
+    var moved = g[i];
+    g[i] = g[j];
+    g[j] = moved;
+    if (step > 0) moved.row.insertBefore(g[i].el, moved.el);
+    else moved.row.insertBefore(moved.el, g[i].el);
+    focusAt(curGroup, j);
+  }
+  function finishEdit() {
+    var g = groups[appsGroup()];
+    g.forEach(function(e) { e.el.classList.remove("editing"); });
+    document.getElementById("edit-hint").className = "";
+    editing = false;
+    var ids = g.filter(function(e) { return e.item.id && !e.item.allaAppar; }).map(function(e) { return e.item.id; });
+    saveInst({ appar: ids }, function(ok) { if (!ok) toast("Kunde inte spara raden"); });
+  }
+  function removeEdit() {
+    var g = groups[curGroup], e = g[curIndex];
+    e.el.classList.add("removing");
+    setTimeout(function() { if (e.el.parentNode) e.el.parentNode.removeChild(e.el); }, 260);
+    g.splice(curIndex, 1);
+    toast(e.item.namn + " är borttagen från raden");
+    finishEdit();
+    focusAt(curGroup, Math.min(curIndex, g.length - 1));
+  }
+  function editKey(k) {
+    if (k === 37) moveEdit(-1);
+    else if (k === 39) moveEdit(1);
+    else if (k === 40) removeEdit();
+    else if (k === 13 || k === 461) finishEdit();
+    else if (k !== 38) return false;
+    return true;
+  }
+  document.addEventListener("keyup", function(ev) {
+    if (ev.keyCode !== 13 || !okTimer) return;
+    clearTimeout(okTimer);
+    okTimer = null;
+    launch(groups[curGroup][curIndex].item);
+  });
+
   // webOS 4.5 skickar keyCode (37-40 pilar, 13 OK, 461 BACK, 405 gul).
   // BACK når sidan för att appinfo.json har disableBackHistoryAPI; utan det stängs hemskärmen.
   // BACK en gång gör inget, två gånger snabbt öppnar applistan.
   var lastBack = 0;
   document.addEventListener("keydown", function(ev) {
     var k = ev.keyCode;
-    if (Vaxlare.isOpen() || Meny.isOpen()) {
-      if ((Vaxlare.isOpen() ? Vaxlare : Meny).key(k)) ev.preventDefault();
+    var overlay = Vaxlare.isOpen() ? Vaxlare : AllaAppar.isOpen() ? AllaAppar : Meny.isOpen() ? Meny : null;
+    if (overlay) {
+      if (overlay.key(k)) ev.preventDefault();
+      return;
+    }
+    if (editing) {
+      if (editKey(k)) ev.preventDefault();
       return;
     }
     if (k === 461) {
@@ -575,7 +748,11 @@
     else if (k === 37) focusAt(curGroup, curIndex - 1);
     else if (k === 40) focusAt(Math.min(groups.length - 1, curGroup + 1), curIndex);
     else if (k === 38) focusAt(Math.max(0, curGroup - 1), curIndex);
-    else if (k === 13) launch(groups[curGroup][curIndex].item);
+    else if (k === 13) {
+      // En app på raden öppnas när OK släpps (håll för att redigera); allt annat direkt.
+      if (!editable()) launch(groups[curGroup][curIndex].item);
+      else if (!okTimer) okTimer = setTimeout(function() { okTimer = null; startEdit(); }, 600);
+    }
     else return;
     ev.preventDefault();
   });
@@ -595,13 +772,21 @@
   // börja om på apparna, och ladda om sidan efter en halvtimme så att vädret och apparna är färska.
   var loadedAt = Date.now();
   document.addEventListener("webOSRelaunch", function() {
+    var params = {};
+    try { params = JSON.parse(PalmSystem.launchParams || "{}") || {}; } catch (e) {}
+    // Fönsterhanterarens omstart strax efter att vi öppnat en app: stanna i bakgrunden.
+    if (!params.hem && Date.now() - launchedAt < 8000) return;
+    if (window.PalmSystem && PalmSystem.activate) PalmSystem.activate();
     if (Meny.isOpen()) return;
     Vaxlare.close();
+    AllaAppar.close();
     if (Date.now() - loadedAt > 30 * 60 * 1000) { location.reload(); return; }
     focusAt(INGANGAR_FORST ? 1 : 0, 0);
   });
 </script>
+<script src="qr.js"></script>
 <script src="meny.js"></script>
 <script src="vaxlare.js"></script>
+<script src="allaappar.js"></script>
 </body>
 </html>

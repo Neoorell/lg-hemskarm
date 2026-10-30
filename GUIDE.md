@@ -62,10 +62,11 @@ Din bakgrundsbild, väderort och HOME-knappens kod finns kvar efter en uppdateri
 
 ## Egen bakgrundsbild (på Macen)
 
-Välj en bild, helst liggande och ungefär 1920×1080, och skicka den till TV:n:
+Välj en bild, helst liggande och ungefär 1920×1080, lägg den i **Dokument** och skicka den till TV:n
+(mappen Dokument heter `~/Documents` i Terminal):
 
 ```sh
-cat ~/Downloads/minbild.jpg | ssh root@192.168.0.222 'cat > /media/developer/custom_home/bakgrund.jpg'
+cat ~/Documents/minbild.jpg | ssh root@192.168.0.222 'cat > /media/developer/custom_home/bakgrund.jpg'
 ```
 
 Tryck HOME så syns den. Bilden måste vara en **.jpg** och heta exakt `bakgrund.jpg` på TV:n.
@@ -125,10 +126,10 @@ Ta sedan bort appen **Hemskärm** som vilken app som helst. LG:s vanliga hemskä
 
 ## Manuell installation (om Homebrew Channel-vägen inte fungerar)
 
-Ladda ner `.ipk`-filen från mappen `release` på https://github.com/Neoorell/lg-hemskarm till Macen. Sedan, på Macen:
+Ladda ner `.ipk`-filen från mappen `release` på https://github.com/Neoorell/lg-hemskarm och lägg den i **Dokument**. Sedan, på Macen:
 
 ```sh
-cd ~/Downloads
+cd ~/Documents
 cat se.minhemskarm.launcher_*_all.ipk | ssh root@192.168.0.222 'cat > /tmp/hem.ipk'
 ```
 

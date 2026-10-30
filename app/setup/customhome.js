@@ -5,6 +5,7 @@
 //   node customhome.js learn   tryck Home några gånger för att lära in fjärrkontrollens knappkod
 //   node customhome.js apps    läser in TV:ns app-lista till tvapps.js
 //   node customhome.js weather hämtar vädret till weather.js
+//   node customhome.js spara B64 sparar hemskärmens inställningar (base64-kodad JSON) till installningar.js
 //
 // Knapp- och påslagsbevakningen bygger på watchers från github.com/NaveenDA/lg-webos-custom-home (MIT).
 
@@ -17,6 +18,7 @@ var HOME_DIR = process.env.CUSTOMHOME_DIR || "/media/developer/custom_home";
 var CONF = path.join(HOME_DIR, "homekey.conf");
 var PLATS = path.join(HOME_DIR, "plats.conf");
 var APPS_JS = path.join(HOME_DIR, "tvapps.js");
+var SETTINGS_JS = path.join(HOME_DIR, "installningar.js");
 var WEATHER_JS = path.join(HOME_DIR, "weather.js");
 var INPUT_DIR = process.env.CUSTOMHOME_INPUT || "/dev/input";
 var DEFAULT_CODES = [773]; // LG-fjärrkontrollens Home på många modeller; lär in din egen med "learn"
@@ -123,7 +125,7 @@ function refreshApps(cb) {
       data.apps.forEach(function(a) {
         if (a.visible === false) return;
         var o = {};
-        ["id", "title", "icon", "largeIcon", "folderPath", "iconColor"].forEach(function(k) { if (a[k]) o[k] = a[k]; });
+        ["id", "title", "icon", "largeIcon", "folderPath", "iconColor", "version"].forEach(function(k) { if (a[k]) o[k] = a[k]; });
         var ikon = iconData(a);
         if (ikon) icons[a.id] = ikon;
         apps.push(o);
@@ -218,7 +220,7 @@ function watchKeys(onKey) {
   }
 
   scan();
-  return setInterval(scan, 10000);
+  return setInterval(scan, 3000);
 }
 
 function homekeyWatcher() {
@@ -249,8 +251,10 @@ function powerWatcher() {
       var state = m[1];
       if (state !== prev) log("strömläge: " + state);
       if (state === "Active" && prev === null && uptime() < 240) {
-        // Kallstart: vänta tills webOS själv startat färdigt, annars hamnar vi under live-TV.
-        setTimeout(function() { refreshApps(); launchHome("uppstart"); }, 8000);
+        // Kallstart: webOS är klart ungefär 35 s efter strömpåslaget; startar vi före det hamnar vi
+        // under live-TV. Homebrew Channel startar oss först runt 40 s, så oftast blir det 2 s.
+        var wait = Math.max(2, 35 - uptime());
+        setTimeout(function() { refreshApps(); launchHome("uppstart"); }, wait * 1000);
       } else if (state === "Active" && prev !== null && NOT_OFF_STATES.indexOf(prev) === -1) {
         refreshApps();
         launchHome("TV:n slogs på");
@@ -307,6 +311,56 @@ function learn() {
   }, seconds * 1000);
 }
 
+// ---- inställningar från hemskärmens meny ----
+
+// Hemskärmen anropar "hem spara <base64>" via Homebrew Channels exec, så allt som kommer in
+// kontrolleras och bara kända fält med rimliga värden sparas.
+function cleanText(s, max) {
+  return typeof s === "string" ? s.replace(/[\u0000-\u001f<>]/g, "").slice(0, max) : "";
+}
+
+function cleanSettings(s) {
+  var out = {};
+  if (s.appar instanceof Array) {
+    out.appar = s.appar.filter(function(id) {
+      return typeof id === "string" && /^[\w.\-]{1,100}$/.test(id);
+    }).slice(0, 30);
+  }
+  if (s.ingangar instanceof Array) {
+    out.ingangar = s.ingangar.filter(function(i) {
+      return i && typeof i.id === "string" && /^com\.webos\.app\.[\w.]{1,40}$/.test(i.id);
+    }).slice(0, 8).map(function(i) {
+      return { id: i.id, namn: cleanText(i.namn, 30) || i.id, dold: i.dold === true };
+    });
+  }
+  if (typeof s.bakgrund === "string" && /^[a-z0-9\-]{1,20}$/.test(s.bakgrund)) out.bakgrund = s.bakgrund;
+  if (s.ort && typeof s.ort.lat === "number" && typeof s.ort.lon === "number" &&
+      Math.abs(s.ort.lat) <= 90 && Math.abs(s.ort.lon) <= 180) {
+    out.ort = { namn: cleanText(s.ort.namn, 40) || "Okänd ort", lat: s.ort.lat, lon: s.ort.lon };
+  }
+  return out;
+}
+
+function saveSettings(b64) {
+  var s;
+  try { s = cleanSettings(JSON.parse(new Buffer(b64 || "", "base64").toString("utf8"))); } catch (e) {
+    console.log("FEL: kunde inte läsa inställningarna");
+    process.exit(1);
+  }
+  var ort = s.ort;
+  delete s.ort;
+  writeAtomic(SETTINGS_JS, "window.TV_INSTALLNINGAR = " + JSON.stringify(s) + ";\n");
+  if (!ort) {
+    console.log("OK");
+    process.exit(0);
+  }
+  writeAtomic(PLATS, "LAT=" + ort.lat + "\nLON=" + ort.lon + "\nORT=" + ort.namn + "\n");
+  refreshWeather(function(ok) {
+    console.log(ok ? "OK" : "OK, men vädret kunde inte hämtas");
+    process.exit(0);
+  });
+}
+
 // En uppdatering via Homebrew Channel byter ut den här filen. Starta då om tjänsten
 // med den nya versionen, så att ingen behöver köra setup.sh igen.
 function watchSelf() {
@@ -337,6 +391,8 @@ function main() {
       console.log(ok ? "Väder för " + w.ort + ": " + w.temp + "°" : "Kunde inte hämta vädret");
       process.exit(ok ? 0 : 1);
     });
+  } else if (cmd === "spara") {
+    saveSettings(process.argv[3]);
   } else if (cmd === "run") {
     log("startar (node " + process.version + ")");
     homekeyWatcher();
@@ -348,7 +404,7 @@ function main() {
     setInterval(refreshBackground, 15000);
     watchSelf();
   } else {
-    console.log("Användning: node customhome.js run|learn|apps|weather");
+    console.log("Användning: node customhome.js run|learn|apps|weather|spara");
     process.exit(2);
   }
 }

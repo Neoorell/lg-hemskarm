@@ -28,15 +28,21 @@ rootning: svara på svenska, förklara enkelt och skriv ut exakt vilka kommandon
 - [x] Lägg till app-källan i Homebrew Channel och installera **Hemskärm** (se GUIDE.md steg 2).
 - [x] Kör `setup.sh` en gång (GUIDE.md steg 3). I 2.1.0 frös tjänsten direkt (se Begränsningar); rättat i 2.1.1.
 - [x] Uppdatera till 2.1.1 på TV:n och bekräfta att HOME öppnar hemskärmen med riktiga fjärrkontrollen.
-- [ ] Bekräfta att LG:s ikoner syns i 2.1.3 (2.1.2 visade reservloggorna eftersom bilderna blockerades).
-- [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (`plats.conf`, se GUIDE.md).
+- [x] Bekräfta att LG:s ikoner syns i 2.1.3 (2.1.2 visade reservloggorna eftersom bilderna blockerades).
+- [ ] 2.2.0 på TV:n: testa menyn (spara, väder, ingångar), BACK och gula knappen med riktiga fjärrkontrollen.
+- [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (väljs nu i menyn).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
 Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den riktiga TV:n med inskickade knapptryck.
 
 ## Projektet
 
-- `app/index.html` – hemskärmen (webbapp). Inställningar (appar, ingångar, bakgrund) överst under `INSTÄLLNINGAR`.
+- `app/index.html` – hemskärmen (webbapp). Standardvärden (appar, ingångar, bakgrund) överst under `INSTÄLLNINGAR`.
+- `app/meny.js` – inställningsmenyn (kugghjulet eller gula knappen 405). Sparar vid stängning genom
+  `luna://org.webosbrew.hbchannel.service/exec` → `sh /media/developer/custom_home/hem spara <base64-JSON>`;
+  tjänsten rensar värdena (`cleanSettings`) och skriver `installningar.js` (och `plats.conf` + vädret vid ny ort).
+  Uppdateringar installeras med `hbchannel.service/install` `{id, ipkUrl, ipkHash}` från `repo.json`.
+  Sidan får inte anropa `applicationManager/getAppInfo`; den installerade versionen tas från `tvapps.js`.
   Apparnas ID letas upp via deras namn på TV:n (`hitta`), så ID:n behöver inte vara kända.
 - `app/setup/customhome.js` – bakgrundstjänst som körs på TV:ns node: startar hemskärmen vid HOME-tryck
   (läser `/dev/input/event*` utan att låsa) och vid påslag (`luna://com.webos.service.tvpower`),
@@ -45,7 +51,7 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
 - `app/setup/setup.sh` – körs en gång som root: hittar node, lägger autostart i
   `/var/lib/webosbrew/init.d/50-customhome`, lär in HOME-knappens kod. `uninstall.sh` tar bort det.
 - Användardata på TV:n ligger i `/media/developer/custom_home/` (bakgrund.jpg, plats.conf, homekey.conf,
-  tvapps.js, ikoner.js, bakgrund.js, weather.js) och överlever uppdateringar.
+  tvapps.js, ikoner.js, bakgrund.js, weather.js, installningar.js) och överlever uppdateringar.
 - `build/build_ipk.py` – bygger `.ipk` och Homebrew Channel-filerna till `release/`.
 - `GUIDE.md` – ägarens guide på svenska. Håll den i synk med ändringar.
 
@@ -53,13 +59,19 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
 
 - **webOS 4.5:s webbläsare är Chromium 53.** I `index.html`: ingen `inset`, flex-`gap`, CSS grid, `min()/max()`,
   `backdrop-filter`, `scrollTo({behavior})`. Bara ES5 (var/function, inga pilar, mallsträngar, let/const).
-  Fjärrkontrollen skickar `keyCode` (37–40 pilar, 13 OK).
+  Fjärrkontrollen skickar `keyCode` (37–40 pilar, 13 OK, 461 BACK, 405 gul). BACK når bara sidan tack vare
+  `"disableBackHistoryAPI": true` i `appinfo.json`; utan den stänger BACK hemskärmen och LG:s meny syns.
 - **node 0.12** för `customhome.js`: samma ES5-regler, `new Buffer`, inga löften/async.
   **Läs aldrig `/dev/input` med `fs.read`**: varje väntande läsning låser en av trådpoolens 4 trådar
   (`UV_THREADPOOL_SIZE` går inte att höja inifrån) och hela node fryser vid nästa `spawn`/`execFile`.
   `watchKeys` läser därför varje enhet via en egen `cat`-process. Avsluta med `hardExit()` så att
   `cat`-processerna och `luna-send` stängs.
-- TV:n har 9 indataenheter (event0–8, resten av event9–31 saknar enhet). Fjärrkontrollen är
+- **Kallstart:** skärmen tänds ~13 s efter strömpåslag, men Homebrew Channel kör `init.d` först runt 40 s
+  (efter sina egna steg i `startup.sh`, som inte får ändras). HOME går till LG fram till dess; tjänsten öppnar
+  hemskärmen så fort den är igång (`uppstart`). Med Quick Start+ på blir avstängning viloläge och tjänsten
+  fortsätter köra.
+- TV:n har 6–9 indataenheter (event0–5 alltid; "IoT keypad", "Smart Remote RCU Input" och "LGE Network Input"
+  dyker upp senare), resten av event0–31 saknar enhet (ENXIO). Nya enheter letas upp var 3:e sekund. Fjärrkontrollen är
   "LGE RCU" på `event1`, HOME = kod 773.
 - **Hemskärmen får inte ladda bilder utanför appens mapp** (`<img>`/`new Image()` med `file:///media/...`
   ger fel), men `<script src="file:///media/developer/custom_home/...">` fungerar. Bilder från TV:n

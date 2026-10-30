@@ -77,6 +77,39 @@
   .input-name { font-size: 24px; font-weight: 600; }
   .input.focused { transform: scale(1.1); background: rgba(255,255,255,0.95); border-color: #fff; color: #111; }
   .input.focused svg { stroke: #111; }
+  /* kugghjulet sist bland ingångarna; pricken visar att en ny version finns */
+  .input.gear { padding: 0 18px; position: relative; }
+  .input.gear svg { margin-right: 0; }
+  .badge { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 8px; background: #ff4757; border: 2px solid #fff; display: none; }
+  .badge.show { display: block; }
+
+  /* ---- inställningsmenyn ---- */
+  #meny { background: rgba(0,0,0,0.55); display: none; }
+  #meny.show { display: block; }
+  .m-panel {
+    position: absolute; top: 90px; bottom: 90px; left: 50%; width: 980px; margin-left: -490px;
+    background: rgba(18,20,28,0.94); border-radius: 30px; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    padding: 44px 50px 0;
+  }
+  .m-title { font-size: 40px; font-weight: 600; }
+  .m-sub { font-size: 20px; color: rgba(255,255,255,0.55); margin-top: 6px; height: 26px; }
+  .m-list { position: absolute; top: 150px; bottom: 96px; left: 30px; right: 30px; overflow: hidden; }
+  .m-row {
+    display: flex; align-items: center; height: 76px; padding: 0 22px; margin-bottom: 6px;
+    border-radius: 16px; font-size: 26px;
+  }
+  .m-row.focused { background: #fff; color: #111; }
+  .m-row.dim { opacity: 0.45; }
+  .m-thumb { width: 52px; height: 52px; border-radius: 10px; margin-right: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .m-thumb img { width: 46px; height: 46px; }
+  .m-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-value { font-size: 22px; color: rgba(255,255,255,0.6); margin-left: 20px; white-space: nowrap; }
+  .m-row.focused .m-value { color: rgba(0,0,0,0.6); }
+  .m-value.on { color: #2ed573; font-weight: 600; }
+  .m-row.focused .m-value.on { color: #0a8f43; }
+  .m-row input { font: inherit; font-size: 24px; width: 420px; padding: 8px 14px; border-radius: 10px; border: 2px solid #111; }
+  .m-hint { position: absolute; left: 50px; right: 50px; bottom: 34px; font-size: 19px; color: rgba(255,255,255,0.55); }
+  .m-hint b { color: #fff; font-weight: 600; }
 
   #toast {
     position: absolute; left: 50%; top: 64px; transform: translateX(-50%);
@@ -91,6 +124,8 @@
 <script src="file:///media/developer/custom_home/ikoner.js"></script>
 <script src="file:///media/developer/custom_home/bakgrund.js"></script>
 <script src="file:///media/developer/custom_home/weather.js"></script>
+<!-- Det som ändras i hemskärmens meny (kugghjulet eller gula knappen) -->
+<script src="file:///media/developer/custom_home/installningar.js"></script>
 </head>
 <body>
   <div id="sky" class="fill"></div>
@@ -108,16 +143,25 @@
   </div>
 
   <div class="sections" id="sections"></div>
+  <div id="meny" class="fill">
+    <div class="m-panel">
+      <div class="m-title" id="m-title"></div>
+      <div class="m-sub" id="m-sub"></div>
+      <div class="m-list" id="m-list"></div>
+      <div class="m-hint" id="m-hint"></div>
+    </div>
+  </div>
   <div id="toast"></div>
 
 <script>
   // =====================================================================
-  //  INSTÄLLNINGAR – det är bara här du behöver ändra
+  //  INSTÄLLNINGAR – det här är standardvärdena. Det som ändras i hemskärmens
+  //  meny (kugghjulet eller gula knappen) sparas på TV:n och gäller före dem.
   // =====================================================================
 
-  // Bakgrundsbild. En egen bild på TV:n (/media/developer/custom_home/bakgrund.jpg)
-  // används i första hand; annars den här länken. Tom sträng = bara stjärnhimmel.
-  var BAKGRUND = "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1920&auto=format&fit=crop";
+  // Bakgrundsbild: ett id ur BAKGRUNDER nedan. En egen bild på TV:n
+  // (/media/developer/custom_home/bakgrund.jpg) används i första hand om den finns.
+  var BAKGRUND = "berg";
 
   // true = ingångarna (HDMI) visas överst, false = apparna överst.
   var INGANGAR_FORST = true;
@@ -139,13 +183,27 @@
     { namn: "Prime Video", hitta: ["prime video", "amazon prime video"], id: "amazon", bg: "linear-gradient(135deg,#0a4fb5,#1aa0ff)", svg: "PRIME" }
   ];
 
-  // Ingångarna. Byt gärna namn, t.ex. "PlayStation" eller "Apple TV".
+  // Ingångarna. Byt gärna namn, t.ex. "PlayStation" eller "Apple TV". dold: true = visas inte.
   var INGANGAR = [
     { namn: "HDMI 1", id: "com.webos.app.hdmi1" },
-    { namn: "HDMI 2", id: "com.webos.app.hdmi2" }
+    { namn: "HDMI 2", id: "com.webos.app.hdmi2" },
+    { namn: "HDMI 3", id: "com.webos.app.hdmi3", dold: true }
   ];
 
   // =====================================================================
+
+  function unsplash(id) { return "https://images.unsplash.com/photo-" + id + "?q=80&w=1920&auto=format&fit=crop"; }
+  var BAKGRUNDER = [
+    { id: "berg",     namn: "Berg och stjärnhimmel", url: unsplash("1519681393784-d120267933ba") },
+    { id: "molnhav",  namn: "Molnhav",               url: unsplash("1506905925346-21bda4d32df4") },
+    { id: "fjallsjo", namn: "Fjällsjö",              url: unsplash("1501785888041-af3ef285b470") },
+    { id: "strand",   namn: "Strand",                url: unsplash("1507525428034-b723cf961d3e") },
+    { id: "gront",    namn: "Grönt landskap",        url: unsplash("1472214103451-9374bd1c798e") },
+    { id: "dimma",    namn: "Dimmiga berg",          url: unsplash("1470071459604-3b5ec3a7fe05") },
+    { id: "stjarnor", namn: "Bara stjärnhimmel",     url: "" }
+  ];
+  var INST = window.TV_INSTALLNINGAR || {};
+  var REPO_URL = "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/repo.json";
 
   var NETFLIX_SVG = '<div class="icon60"><svg viewBox="0 0 60 90">' +
     '<rect x="2" y="0" width="16" height="90" fill="#b1060f"/>' +
@@ -165,6 +223,9 @@
   var LOGOS = { NETFLIX: NETFLIX_SVG, YT: YT_SVG, PRIME: PRIME_SVG };
   var HDMI_SVG = '<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">' +
     '<path d="M5 16h38v9l-5 7H10l-5-7z"/><path d="M13 22h22"/></svg>';
+  var GEAR_SVG = '<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">' +
+    '<circle cx="24" cy="24" r="6"/><path d="M24 5v6M24 37v6M5 24h6M37 24h6M10.6 10.6l4.2 4.2M33.2 33.2l4.2 4.2M10.6 37.4l4.2-4.2M33.2 14.8l4.2-4.2"/>' +
+    '<circle cx="24" cy="24" r="13"/></svg>';
 
   // ---- bakgrund: egen bild på TV:n, annars länken, annars stjärnhimmel ----
   function drawStars() {
@@ -179,19 +240,35 @@
       ctx.fill();
     }
   }
-  function loadBackground(sources) {
-    if (!sources.length) return;
+  var bgToken = 0;
+  function loadBackground(sources, token) {
+    if (!sources.length || token !== bgToken) return;
     var img = new Image();
     img.onload = function() {
+      if (token !== bgToken) return;
       var p = document.getElementById("photo");
       p.style.backgroundImage = "url('" + sources[0] + "')";
       p.className = "fill loaded";
     };
-    img.onerror = function() { loadBackground(sources.slice(1)); };
+    img.onerror = function() { loadBackground(sources.slice(1), token); };
     img.src = sources[0];
   }
+  function bakgrundId() { return INST.bakgrund || (window.TV_BAKGRUND ? "egen" : BAKGRUND); }
+  function bakgrundKallor(id) {
+    var src = [];
+    if (id === "egen" && window.TV_BAKGRUND) src.push(window.TV_BAKGRUND);
+    BAKGRUNDER.forEach(function(b) { if (b.id === id && b.url) src.push(b.url); });
+    if (id !== "stjarnor") src.push(BAKGRUNDER[0].url);
+    return src;
+  }
+  function setBackground(id) {
+    var p = document.getElementById("photo");
+    p.className = "fill";
+    bgToken++;
+    loadBackground(bakgrundKallor(id), bgToken);
+  }
   drawStars();
-  loadBackground((window.TV_BAKGRUND ? [window.TV_BAKGRUND] : []).concat(BAKGRUND ? [BAKGRUND] : []));
+  setBackground(bakgrundId());
 
   // ---- klocka ----
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
@@ -261,6 +338,7 @@
   }
 
   function launch(item) {
+    if (item.meny) { Meny.open(); return; }
     if (!item.id) { toast(item.namn + " hittades inte på TV:n"); return; }
     callLuna("luna://com.webos.applicationManager/launch", { id: item.id }, function(resp) {
       if (resp && resp.returnValue === false) toast("Kunde inte starta " + item.namn);
@@ -307,6 +385,55 @@
       };
     });
   }
+  // Apparna som valts i menyn (id:n i ordning), annars APPAR ovan.
+  function chosenApps(list) {
+    var defaults = resolveApps(list);
+    if (!(INST.appar instanceof Array) || !list) return defaults;
+    var byId = {};
+    list.forEach(function(a) { byId[a.id] = a; });
+    return INST.appar.filter(function(id) { return byId[id]; }).map(function(id) {
+      for (var i = 0; i < defaults.length; i++) if (defaults[i].id === id) return defaults[i];
+      var tv = byId[id], icon = iconUrl(tv);
+      return {
+        namn: tv.title, text: tv.title, bg: "linear-gradient(135deg,#2b2f3d,#4a5068)", id: id,
+        icon: icon, iconBg: (icon && tv.iconColor) ? tv.iconColor : null, missing: false
+      };
+    });
+  }
+  function allInputs() { return INST.ingangar instanceof Array ? INST.ingangar : INGANGAR; }
+  function chosenInputs() { return allInputs().filter(function(i) { return !i.dold; }); }
+
+  // ---- uppdateringar: jämför installerad version med app-källan på GitHub ----
+  var UPPDATERING = null, APP_VERSION = null;
+  function versionNewer(a, b) {
+    var x = String(a).split("."), y = String(b).split(".");
+    for (var i = 0; i < Math.max(x.length, y.length); i++) {
+      var d = (parseInt(x[i], 10) || 0) - (parseInt(y[i], 10) || 0);
+      if (d) return d > 0;
+    }
+    return false;
+  }
+  function installedVersion() {
+    var list = window.TV_APPS || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === "se.minhemskarm.launcher") return list[i].version || null;
+    return null;
+  }
+  function checkUpdate(cb) {
+    APP_VERSION = installedVersion();
+    var x = new XMLHttpRequest();
+    x.onload = function() {
+      var pkg = null;
+      try { pkg = JSON.parse(x.responseText).packages[0].manifest; } catch (e) {}
+      UPPDATERING = (pkg && APP_VERSION && versionNewer(pkg.version, APP_VERSION))
+        ? { version: pkg.version, ipkUrl: pkg.ipkUrl, sha: pkg.ipkHash && pkg.ipkHash.sha256 } : null;
+      var b = document.getElementById("badge");
+      if (b) b.className = "badge" + (UPPDATERING ? " show" : "");
+      if (cb) cb(pkg ? pkg.version : null);
+    };
+    x.onerror = function() { if (cb) cb(null); };
+    x.open("GET", REPO_URL + "?t=" + Date.now());
+    x.send();
+  }
 
   // ---- rutor ----
   function fillLogo(el, item) {
@@ -350,6 +477,12 @@
     el.querySelector(".input-name").textContent = item.namn;
     return { el: el, item: item };
   }
+  function makeGearTile() {
+    var el = document.createElement("div");
+    el.className = "input gear";
+    el.innerHTML = GEAR_SVG + '<span class="badge' + (UPPDATERING ? " show" : "") + '" id="badge"></span>';
+    return { el: el, item: { meny: true, namn: "Inställningar" } };
+  }
 
   // ---- uppbyggnad och fjärrkontroll ----
   var groups = [], curGroup = 0, curIndex = 0;
@@ -374,8 +507,8 @@
   }
 
   function render(tvApps) {
-    var apps = resolveApps(tvApps).map(makeAppTile);
-    var inputs = INGANGAR.map(makeInputTile);
+    var apps = chosenApps(tvApps).map(makeAppTile);
+    var inputs = chosenInputs().map(makeInputTile).concat([makeGearTile()]);
     var order = INGANGAR_FORST ? [["Ingångar", inputs], ["Appar", apps]] : [["Appar", apps], ["Ingångar", inputs]];
     var container = document.getElementById("sections");
     container.innerHTML = "";
@@ -404,10 +537,17 @@
     scrollIntoRow(e);
   }
 
-  // webOS 4.5 skickar keyCode (37-40 pilar, 13 OK)
+  // webOS 4.5 skickar keyCode (37-40 pilar, 13 OK, 461 BACK, 405 gul).
+  // BACK når sidan för att appinfo.json har disableBackHistoryAPI; utan det stängs hemskärmen.
   document.addEventListener("keydown", function(ev) {
     var k = ev.keyCode;
-    if (k === 39) focusAt(curGroup, curIndex + 1);
+    if (Meny.isOpen()) {
+      if (Meny.key(k)) ev.preventDefault();
+      return;
+    }
+    if (k === 461) { /* BACK: stanna kvar på hemskärmen */ }
+    else if (k === 405) Meny.open();
+    else if (k === 39) focusAt(curGroup, curIndex + 1);
     else if (k === 37) focusAt(curGroup, curIndex - 1);
     else if (k === 40) focusAt(Math.min(groups.length - 1, curGroup + 1), curIndex);
     else if (k === 38) focusAt(Math.max(0, curGroup - 1), curIndex);
@@ -425,6 +565,8 @@
       if (resp && resp.apps && resp.apps.length) render(resp.apps);
     });
   }
+  checkUpdate();
 </script>
+<script src="meny.js"></script>
 </body>
 </html>

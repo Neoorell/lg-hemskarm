@@ -52,13 +52,27 @@ Tryck HOME. Klart! 🎉
 
 ---
 
+## Inställningar på TV:n
+
+Markera **kugghjulet** sist bland ingångarna och tryck OK, eller tryck på **gula knappen** på
+fjärrkontrollen. Där kan du:
+- **Appar på raden:** OK lägger till eller tar bort en app, ◀ ▶ flyttar den.
+- **Ingångar:** visa eller dölj HDMI 1–3 och byt namn, t.ex. till "PlayStation".
+- **Bakgrund:** välj bland några foton, bara stjärnhimmel eller din egen bild.
+- **Väder:** välj ort i listan eller sök efter en annan.
+- **Uppdateringar:** se om en ny version finns och installera den direkt.
+
+**BACK** går tillbaka ett steg. Ändringarna sparas när du stänger menyn, och hemskärmen laddas om.
+BACK på själva hemskärmen gör ingenting, så du hamnar inte i LG:s gamla meny av misstag.
+
 ## Uppdateringar
 
-Öppna **Homebrew Channel**. Finns en ny version av **Hemskärm** visas det där, och du
-installerar den som vilken homebrew-app som helst. Bakgrundstjänsten märker själv att den har
-uppdaterats och startar om sig inom en minut. Du behöver **inte** köra `setup.sh` igen.
+En röd prick på kugghjulet betyder att en ny version finns. Installera den under
+**Inställningar → Uppdateringar**, eller i **Homebrew Channel** som vilken homebrew-app som helst.
+Bakgrundstjänsten märker själv att den har uppdaterats och startar om sig inom en minut.
+Du behöver **inte** köra `setup.sh` igen.
 
-Din bakgrundsbild, väderort och HOME-knappens kod finns kvar efter en uppdatering.
+Din bakgrundsbild, väderort, dina inställningar och HOME-knappens kod finns kvar efter en uppdatering.
 
 ## Egen bakgrundsbild (på Macen)
 
@@ -70,12 +84,13 @@ cat ~/Documents/minbild.jpg | ssh root@192.168.0.222 'cat > /media/developer/cus
 ```
 
 Vänta cirka 15 sekunder (bakgrundstjänsten läser in bilden) och tryck HOME så syns den. Bilden måste vara en **.jpg** och heta exakt `bakgrund.jpg` på TV:n.
-Ta bort den med `rm /media/developer/custom_home/bakgrund.jpg` på TV:n för att få tillbaka bergsfotot.
+Välj den under **Inställningar → Bakgrund → Egen bild** om ett annat foto är valt.
+Ta bort den med `rm /media/developer/custom_home/bakgrund.jpg` på TV:n.
 
 ## Väder för din ort (på TV:n)
 
-Vädret visar Stockholm från början. Byt ort genom att ange latitud och longitud
-(slå upp din ort på t.ex. latlong.net). Exempel för Göteborg:
+Enklast: **Inställningar → Väder** på TV:n. Det går också med ett kommando, med latitud och
+longitud (slå upp din ort på t.ex. latlong.net). Exempel för Göteborg:
 
 ```sh
 printf 'LAT=57.71\nLON=11.97\nORT=Göteborg\n' > /media/developer/custom_home/plats.conf
@@ -84,9 +99,10 @@ sh /media/developer/custom_home/hem weather
 
 Vädret uppdateras automatiskt var 30:e minut (från Open-Meteo, inget konto behövs).
 
-## Ändra appar, namn och färger
+## Ändra appar, namn och färger i koden
 
-Överst i `app/index.html` under **INSTÄLLNINGAR**:
+Det mesta görs enklast i menyn på TV:n (se ovan). Det som står överst i `app/index.html` under
+**INSTÄLLNINGAR** är standardvärdena, som gäller tills du ändrar något i menyn:
 - **Lägga till en app:** kopiera en rad i `APPAR`, ändra `namn`, `hitta` (appens namn på TV:n
   med små bokstäver) och färg. ID:t letas upp automatiskt.
 - **Ikonerna** hämtas från TV:n, samma bilder och färger som LG:s hemrad. Färgen och texten i
@@ -121,6 +137,7 @@ Ta sedan bort appen **Hemskärm** som vilken app som helst. LG:s vanliga hemskä
 
 | Problem | Lösning |
 |---|---|
+| HOME öppnar LG:s meny precis efter att TV:n slagits på | Normalt den första halvminuten: tjänsten startar ungefär 30 sekunder efter att skärmen tänts, och sedan öppnas hemskärmen av sig själv. Slå på **Quick Start+** (Inställningar → Alla inställningar → Allmänt) så går TV:n bara i viloläge och hemskärmen fungerar direkt |
 | Inget händer när jag trycker HOME | Kör `hem learn` (se tabellen ovan) och tryck HOME 3 gånger |
 | Inget väder syns | Kör `hem weather` och se vad det står. Vädret döljs om det är äldre än 6 timmar |
 | En app är nedtonad fast den finns | Kontrollera att `hitta` stämmer med appens namn på TV:n och kör `hem apps` |

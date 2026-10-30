@@ -11,7 +11,7 @@ En egen hemskärm i Luma/Apple TV-stil för rootade LG-TV:ar, byggd för **webOS
 Lägg till den här adressen som extra repository i Homebrew Channels inställningar:
 
 ```
-https://github.com/Neoorell/lg-hemskarm/releases/latest/download/repo.json
+https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/repo.json
 ```
 
 Installera **Hemskärm** från listan och kör sedan en gång, som root över SSH:
@@ -31,7 +31,7 @@ Hela guiden på svenska: [GUIDE.md](GUIDE.md)
 python3 build/build_ipk.py
 ```
 
-Allt i `dist/` laddas upp till en GitHub-release med taggen `v<version>` (versionen står i `app/appinfo.json`).
+Höj versionen i `app/appinfo.json`, bygg och checka in `release/`. Homebrew Channel ser då den nya versionen.
 
 ## Krav
 

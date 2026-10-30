@@ -30,7 +30,7 @@ Låt TV:ns "Home screen" stå kvar på **Basic**. Det är den lättaste menyn oc
 1. Öppna **Homebrew Channel** och gå till **Settings**.
 2. Lägg till den här adressen bland de extra repositories (app-källor):
    ```
-   https://github.com/Neoorell/lg-hemskarm/releases/latest/download/repo.json
+   https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/repo.json
    ```
 3. Gå tillbaka till listan med appar. **Hemskärm** finns nu där. Välj den och tryck **Install**.
 
@@ -125,7 +125,7 @@ Ta sedan bort appen **Hemskärm** som vilken app som helst. LG:s vanliga hemskä
 
 ## Manuell installation (om Homebrew Channel-vägen inte fungerar)
 
-Ladda ner `.ipk`-filen från https://github.com/Neoorell/lg-hemskarm/releases/latest till Macen. Sedan, på Macen:
+Ladda ner `.ipk`-filen från mappen `release` på https://github.com/Neoorell/lg-hemskarm till Macen. Sedan, på Macen:
 
 ```sh
 cd ~/Downloads

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Paketerar app/ till en .ipk och skapar filerna för Homebrew Channel i dist/.
+"""Paketerar app/ till en .ipk och skapar filerna för Homebrew Channel i release/.
 
   python3 build/build_ipk.py
 
-dist/ innehåller sedan allt som laddas upp till en GitHub-release med taggen v<version>:
+release/ checkas in i repot; Homebrew Channel läser filerna direkt från GitHub:
   <id>_<version>_all.ipk  appen
   repo.json               app-källan som Homebrew Channel läser
   app-icon.png            ikonen som visas i Homebrew Channel
@@ -13,7 +13,7 @@ import hashlib, io, json, os, shutil, tarfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(ROOT, "app")
-DIST = os.path.join(ROOT, "dist")
+DIST = os.path.join(ROOT, "release")
 GITHUB_REPO = "Neoorell/lg-hemskarm"
 
 info = json.load(open(os.path.join(APP, "appinfo.json")))
@@ -89,7 +89,7 @@ def main():
                 "som root för att koppla HOME-knappen. Senare uppdateringar behöver inte det.</p>\n"
                 "<p>Mer information: https://github.com/%s</p>\n" % (short, app_id, GITHUB_REPO))
 
-    base = "https://github.com/%s/releases/download/v%s/" % (GITHUB_REPO, version)
+    base = "https://raw.githubusercontent.com/%s/main/release/" % GITHUB_REPO
     manifest = {
         "id": app_id,
         "version": version,
@@ -119,7 +119,7 @@ def main():
         f.write("\n")
 
     for name in sorted(os.listdir(DIST)):
-        print("dist/%-40s %8d bytes" % (name, os.path.getsize(os.path.join(DIST, name))))
+        print("release/%-40s %8d bytes" % (name, os.path.getsize(os.path.join(DIST, name))))
 
 
 if __name__ == "__main__":

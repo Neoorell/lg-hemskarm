@@ -69,7 +69,7 @@ Välj en bild, helst liggande och ungefär 1920×1080, lägg den i **Dokument** 
 cat ~/Documents/minbild.jpg | ssh root@192.168.0.222 'cat > /media/developer/custom_home/bakgrund.jpg'
 ```
 
-Tryck HOME så syns den. Bilden måste vara en **.jpg** och heta exakt `bakgrund.jpg` på TV:n.
+Vänta cirka 15 sekunder (bakgrundstjänsten läser in bilden) och tryck HOME så syns den. Bilden måste vara en **.jpg** och heta exakt `bakgrund.jpg` på TV:n.
 Ta bort den med `rm /media/developer/custom_home/bakgrund.jpg` på TV:n för att få tillbaka bergsfotot.
 
 ## Väder för din ort (på TV:n)

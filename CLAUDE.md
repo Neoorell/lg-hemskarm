@@ -27,7 +27,8 @@ rootning: svara på svenska, förklara enkelt och skriv ut exakt vilka kommandon
 - [x] Avinstallera Homebar: `sh /var/lib/webosbrew/rawin-launcher/uninstall.sh` (på TV:n). `setup.sh` vägrar köra annars.
 - [x] Lägg till app-källan i Homebrew Channel och installera **Hemskärm** (se GUIDE.md steg 2).
 - [x] Kör `setup.sh` en gång (GUIDE.md steg 3). I 2.1.0 frös tjänsten direkt (se Begränsningar); rättat i 2.1.1.
-- [ ] Uppdatera till 2.1.1 på TV:n och bekräfta att HOME öppnar hemskärmen med riktiga fjärrkontrollen.
+- [x] Uppdatera till 2.1.1 på TV:n och bekräfta att HOME öppnar hemskärmen med riktiga fjärrkontrollen.
+- [ ] Bekräfta att LG:s ikoner syns i 2.1.3 (2.1.2 visade reservloggorna eftersom bilderna blockerades).
 - [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (`plats.conf`, se GUIDE.md).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
@@ -44,7 +45,7 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
 - `app/setup/setup.sh` – körs en gång som root: hittar node, lägger autostart i
   `/var/lib/webosbrew/init.d/50-customhome`, lär in HOME-knappens kod. `uninstall.sh` tar bort det.
 - Användardata på TV:n ligger i `/media/developer/custom_home/` (bakgrund.jpg, plats.conf, homekey.conf,
-  tvapps.js, weather.js) och överlever uppdateringar.
+  tvapps.js, ikoner.js, bakgrund.js, weather.js) och överlever uppdateringar.
 - `build/build_ipk.py` – bygger `.ipk` och Homebrew Channel-filerna till `release/`.
 - `GUIDE.md` – ägarens guide på svenska. Håll den i synk med ändringar.
 
@@ -60,12 +61,15 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   `cat`-processerna och `luna-send` stängs.
 - TV:n har 9 indataenheter (event0–8, resten av event9–31 saknar enhet). Fjärrkontrollen är
   "LGE RCU" på `event1`, HOME = kod 773.
+- **Hemskärmen får inte ladda bilder utanför appens mapp** (`<img>`/`new Image()` med `file:///media/...`
+  ger fel), men `<script src="file:///media/developer/custom_home/...">` fungerar. Bilder från TV:n
+  (app-ikoner, `bakgrund.jpg`) skrivs därför av tjänsten som data-URL:er i `ikoner.js` och `bakgrund.js`.
 - Appens `trustLevel` ska vara `default` (`trusted` avvisas för tredjepartsappar).
 
 ## Ikonerna
 
-`customhome.js` kopierar varje apps `mediumLargeIcon || largeIcon || icon` till
-`/media/developer/custom_home/ikoner/<id>.png` och skriver `ikon` och `iconColor` i `tvapps.js`.
+`customhome.js` läser varje apps `mediumLargeIcon || largeIcon || icon` och skriver dem som data-URL:er
+i `ikoner.js` (`window.TV_IKONER[id]`), och `iconColor` i `tvapps.js`.
 Samma val som LG:s hemrad (`/usr/palm/applications/com.webos.app.home/qml/Containers/Main/AppTile.qml`):
 115×115-ikonen på `iconColor`. Ägaren vill ha de breda, rundade rutorna (220×132) med LG:s loggor
 och färger i (provade kvadratiska och förstorade/beskurna ikoner, ville inte ha dem).

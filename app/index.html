@@ -86,7 +86,10 @@
   #toast.show { opacity: 1; }
 </style>
 <!-- Filer som bakgrundstjänsten skriver (saknas de händer inget) -->
+<!-- Bilder utanför appens mapp får inte laddas, därför ligger ikonerna och bakgrunden i skript. -->
 <script src="file:///media/developer/custom_home/tvapps.js"></script>
+<script src="file:///media/developer/custom_home/ikoner.js"></script>
+<script src="file:///media/developer/custom_home/bakgrund.js"></script>
 <script src="file:///media/developer/custom_home/weather.js"></script>
 </head>
 <body>
@@ -188,7 +191,7 @@
     img.src = sources[0];
   }
   drawStars();
-  loadBackground(["file:///media/developer/custom_home/bakgrund.jpg"].concat(BAKGRUND ? [BAKGRUND] : []));
+  loadBackground((window.TV_BAKGRUND ? [window.TV_BAKGRUND] : []).concat(BAKGRUND ? [BAKGRUND] : []));
 
   // ---- klocka ----
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
@@ -284,8 +287,7 @@
     return null;
   }
   function iconUrl(app) {
-    // ikon = kopian som bakgrundstjänsten lägger bredvid tvapps.js
-    if (app.ikon) return "file:///media/developer/custom_home/" + app.ikon;
+    if (window.TV_IKONER && window.TV_IKONER[app.id]) return window.TV_IKONER[app.id];
     var p = app.largeIcon || app.icon;
     if (!p) return null;
     if (p.indexOf("://") !== -1) return p;

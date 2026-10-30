@@ -76,46 +76,63 @@ function launchHome(reason) {
 
 // ---- app-listan ----
 
-// Apparnas ikoner ligger där hemskärmen inte alltid får läsa (t.ex. /media/cryptofs),
-// så kopiera dem till ikoner/<id>.png bredvid tvapps.js. Samma val som LG:s hemrad
-// (com.webos.app.home, AppTile.qml) gör, så att ikonerna ser likadana ut.
-var ICON_DIR = path.join(HOME_DIR, "ikoner");
+// Hemskärmen får ladda skript men inte bilder utanför appens egen mapp, så bilderna
+// skrivs som data-URL:er i skriptfiler (ikoner.js, bakgrund.js) bredvid tvapps.js.
+var ICONS_JS = path.join(HOME_DIR, "ikoner.js");
+var BG_JPG = path.join(HOME_DIR, "bakgrund.jpg");
+var BG_JS = path.join(HOME_DIR, "bakgrund.js");
 
-function copyIcon(a) {
+function dataUrl(file) {
+  var ext = path.extname(file).toLowerCase();
+  var type = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/" + ext.slice(1);
+  return "data:" + type + ";base64," + fs.readFileSync(file).toString("base64");
+}
+
+// Samma val som LG:s hemrad (com.webos.app.home, AppTile.qml), så att ikonerna ser likadana ut.
+function iconData(a) {
   var p = a.mediumLargeIcon || a.largeIcon || a.icon;
-  if (!p || p.indexOf("://") !== -1 || /[\/\\]/.test(a.id)) return null;
+  if (!p || p.indexOf("://") !== -1) return null;
   if (p.charAt(0) !== "/") p = path.join(a.folderPath || "", p);
-  var name = a.id + path.extname(p).toLowerCase();
-  var dest = path.join(ICON_DIR, name);
-  try {
-    var src = fs.statSync(p);
-    var old = null;
-    try { old = fs.statSync(dest); } catch (e) {}
-    if (!old || old.size !== src.size || old.mtime.getTime() < src.mtime.getTime()) {
-      if (!fs.existsSync(ICON_DIR)) fs.mkdirSync(ICON_DIR);
-      writeAtomic(dest, fs.readFileSync(p));
+  try { return dataUrl(p); } catch (e) { return null; }
+}
+
+var bgStamp = null;
+function refreshBackground() {
+  var st = null;
+  try { st = fs.statSync(BG_JPG); } catch (e) {}
+  var stamp = st ? st.size + ":" + st.mtime.getTime() : "";
+  if (stamp === bgStamp) return;
+  bgStamp = stamp;
+  if (st) {
+    try {
+      writeAtomic(BG_JS, "window.TV_BAKGRUND = " + JSON.stringify(dataUrl(BG_JPG)) + ";\n");
+      log("bakgrundsbilden inläst");
+    } catch (e) {
+      log("kunde inte läsa bakgrundsbilden: " + e.message);
     }
-    return "ikoner/" + name;
-  } catch (e) {
-    return null;
+  } else {
+    try { fs.unlinkSync(BG_JS); } catch (e) {}
   }
 }
 
 function refreshApps(cb) {
   luna("luna://com.webos.applicationManager/listApps", {}, 15000, function(err, out) {
     var data = parseJson(out);
-    var apps = [];
+    var apps = [], icons = {};
     if (data && data.apps) {
       data.apps.forEach(function(a) {
         if (a.visible === false) return;
         var o = {};
         ["id", "title", "icon", "largeIcon", "folderPath", "iconColor"].forEach(function(k) { if (a[k]) o[k] = a[k]; });
-        var ikon = copyIcon(a);
-        if (ikon) o.ikon = ikon;
+        var ikon = iconData(a);
+        if (ikon) icons[a.id] = ikon;
         apps.push(o);
       });
     }
-    if (apps.length) writeAtomic(APPS_JS, "window.TV_APPS = " + JSON.stringify(apps) + ";\n");
+    if (apps.length) {
+      writeAtomic(ICONS_JS, "window.TV_IKONER = " + JSON.stringify(icons) + ";\n");
+      writeAtomic(APPS_JS, "window.TV_APPS = " + JSON.stringify(apps) + ";\n");
+    }
     if (cb) cb(apps.length);
   });
 }
@@ -326,7 +343,9 @@ function main() {
     powerWatcher();
     refreshApps();
     refreshWeather();
+    refreshBackground();
     setInterval(refreshWeather, 30 * 60 * 1000);
+    setInterval(refreshBackground, 15000);
     watchSelf();
   } else {
     console.log("Användning: node customhome.js run|learn|apps|weather");

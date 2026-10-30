@@ -76,6 +76,31 @@ function launchHome(reason) {
 
 // ---- app-listan ----
 
+// Apparnas ikoner ligger där hemskärmen inte alltid får läsa (t.ex. /media/cryptofs),
+// så kopiera dem till ikoner/<id>.png bredvid tvapps.js. Samma val som LG:s hemrad
+// (com.webos.app.home, AppTile.qml) gör, så att ikonerna ser likadana ut.
+var ICON_DIR = path.join(HOME_DIR, "ikoner");
+
+function copyIcon(a) {
+  var p = a.mediumLargeIcon || a.largeIcon || a.icon;
+  if (!p || p.indexOf("://") !== -1 || /[\/\\]/.test(a.id)) return null;
+  if (p.charAt(0) !== "/") p = path.join(a.folderPath || "", p);
+  var name = a.id + path.extname(p).toLowerCase();
+  var dest = path.join(ICON_DIR, name);
+  try {
+    var src = fs.statSync(p);
+    var old = null;
+    try { old = fs.statSync(dest); } catch (e) {}
+    if (!old || old.size !== src.size || old.mtime.getTime() < src.mtime.getTime()) {
+      if (!fs.existsSync(ICON_DIR)) fs.mkdirSync(ICON_DIR);
+      writeAtomic(dest, fs.readFileSync(p));
+    }
+    return "ikoner/" + name;
+  } catch (e) {
+    return null;
+  }
+}
+
 function refreshApps(cb) {
   luna("luna://com.webos.applicationManager/listApps", {}, 15000, function(err, out) {
     var data = parseJson(out);
@@ -84,7 +109,9 @@ function refreshApps(cb) {
       data.apps.forEach(function(a) {
         if (a.visible === false) return;
         var o = {};
-        ["id", "title", "icon", "largeIcon", "folderPath"].forEach(function(k) { if (a[k]) o[k] = a[k]; });
+        ["id", "title", "icon", "largeIcon", "folderPath", "iconColor"].forEach(function(k) { if (a[k]) o[k] = a[k]; });
+        var ikon = copyIcon(a);
+        if (ikon) o.ikon = ikon;
         apps.push(o);
       });
     }

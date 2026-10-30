@@ -89,6 +89,8 @@ Vädret uppdateras automatiskt var 30:e minut (från Open-Meteo, inget konto beh
 Överst i `app/index.html` under **INSTÄLLNINGAR**:
 - **Lägga till en app:** kopiera en rad i `APPAR`, ändra `namn`, `hitta` (appens namn på TV:n
   med små bokstäver) och färg. ID:t letas upp automatiskt.
+- **Ikonerna** hämtas från TV:n, samma bilder och färger som LG:s hemrad. Färgen och texten i
+  `APPAR` används bara för appar som inte finns på TV:n, eller om du sätter `tvIkon: false`.
 - **Byta namn på en ingång:** t.ex. `namn: "HDMI 1"` till `namn: "PlayStation"`.
 - **Apparna överst:** sätt `INGANGAR_FORST = false`.
 

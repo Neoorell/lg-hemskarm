@@ -62,7 +62,20 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   "LGE RCU" på `event1`, HOME = kod 773.
 - Appens `trustLevel` ska vara `default` (`trusted` avvisas för tredjepartsappar).
 
+## Ikonerna
+
+`customhome.js` kopierar varje apps `mediumLargeIcon || largeIcon || icon` till
+`/media/developer/custom_home/ikoner/<id>.png` och skriver `ikon` och `iconColor` i `tvapps.js`.
+Samma val som LG:s hemrad (`/usr/palm/applications/com.webos.app.home/qml/Containers/Main/AppTile.qml`):
+115×115-ikonen på `iconColor`. Ägaren vill ha de breda, rundade rutorna (220×132) med LG:s loggor
+och färger i (provade kvadratiska och förstorade/beskurna ikoner, ville inte ha dem).
+
 ## Bygga och släppa en ny version
+
+**Installera inte en opublicerad version på TV:n** (t.ex. via `appInstallService/dev/install`):
+Homebrew Channel ser att versionen skiljer sig från `repo.json` och installerar tillbaka den publicerade.
+Testa i stället med `CUSTOMHOME_DIR=/tmp/…` och en förhandsvisning på Macen, och publicera sedan.
+
 
 1. Höj `version` i `app/appinfo.json` (annars ser Homebrew Channel ingen uppdatering).
 2. `python3 build/build_ipk.py`

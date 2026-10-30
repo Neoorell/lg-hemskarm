@@ -61,7 +61,8 @@
   .app.focused .app-name { opacity: 1; }
 
   .wordmark { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
-  .tile img.tv-icon { width: 96px; height: 96px; border-radius: 18px; }
+  /* TV:ns app-ikon i 115x115 på appens iconColor, precis som LG:s hemrad visar den. */
+  .tile img.tv-icon { width: 115px; height: 115px; flex-shrink: 0; }
   .icon60 svg { width: 66px; height: 66px; display: block; }
   .yt-badge svg { width: 74px; height: auto; display: block; }
 
@@ -122,9 +123,9 @@
   //   namn:   appens namn (visas under rutan när den är markerad)
   //   hitta:  appens namn på TV:n med små bokstäver. ID:t letas upp automatiskt.
   //   id:     används bara om appen inte hittas via namnet
-  //   bg:     rutans färg
+  //   bg:     rutans färg, om appen saknar egen ikon på TV:n
   //   text:   text i rutan, om ingen logga finns
-  //   tvIkon: true = använd TV:ns egen app-ikon om den hittas
+  //   tvIkon: false = använd bg/text/logga ovan i stället för TV:ns egen app-ikon
   var APPAR = [
     { namn: "Stremio",     hitta: ["stremio"],                     bg: "linear-gradient(135deg,#1b1146,#7b5bf5)", text: "Stremio" },
     { namn: "TV4 Play",    hitta: ["tv4 play", "tv4"],             bg: "linear-gradient(135deg,#a3000f,#ec1c2e)", text: "TV4" },
@@ -283,6 +284,8 @@
     return null;
   }
   function iconUrl(app) {
+    // ikon = kopian som bakgrundstjänsten lägger bredvid tvapps.js
+    if (app.ikon) return "file:///media/developer/custom_home/" + app.ikon;
     var p = app.largeIcon || app.icon;
     if (!p) return null;
     if (p.indexOf("://") !== -1) return p;
@@ -292,10 +295,12 @@
   function resolveApps(list) {
     return APPAR.map(function(a) {
       var tv = findTvApp(list, a.hitta);
+      var icon = (tv && a.tvIkon !== false) ? iconUrl(tv) : null;
       return {
         namn: a.namn, bg: a.bg, text: a.text, svg: a.svg,
         id: tv ? tv.id : (a.id || null),
-        icon: (tv && a.tvIkon) ? iconUrl(tv) : null,
+        icon: icon,
+        iconBg: (icon && tv.iconColor) ? tv.iconColor : null,
         missing: !!(list && !tv)
       };
     });
@@ -314,7 +319,8 @@
     if (item.icon) {
       var img = document.createElement("img");
       img.className = "tv-icon";
-      img.onerror = textLogo;
+      if (item.iconBg) el.style.background = item.iconBg;
+      img.onerror = function() { el.style.background = item.bg; textLogo(); };
       img.src = item.icon;
       el.appendChild(img);
     } else {

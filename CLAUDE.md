@@ -4,6 +4,14 @@ Egen hemskärm för en rootad LG-TV. Ägaren skriver på svenska och är ny på 
 rootning: svara på svenska, förklara enkelt och skriv ut exakt vilka kommandon som ska köras och
 **var** (Macen eller TV:n). Repot är publikt – lägg aldrig in lösenord eller andra hemligheter här.
 
+## Större uppgifter: fråga om en egen chatt först
+
+Ägarens önskemål 2026-10-29: när ägaren ber om en större uppgift, till exempel en ny funktion i flera steg, en ny design
+eller något annat som tar många steg, fråga först om den ska göras i en egen sidochatt (en ny session) i stället för i den
+pågående chatten. En ny chatt börjar med lite historik och drar därför färre tokens. I Claude Code-appen: erbjud en ny
+session (knapparna "New session" / "Do it here"). Små ändringar, frågor och uppföljningar på det som just gjorts stannar
+i chatten utan att fråga.
+
 ## TV:n
 
 - LG 43UM7100PLB (UM71, 2019), firmware 05.40.97, webOS 4.5 (systemversion 4.10.2), chassi k5lp, ARM 32-bit.

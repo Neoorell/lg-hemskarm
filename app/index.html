@@ -84,11 +84,11 @@
   .badge.show { display: block; }
 
   /* ---- inställningsmenyn ---- */
-  #meny { background: rgba(0,0,0,0.55); display: none; }
+  #meny { background: rgba(0,0,0,0.72); display: none; }
   #meny.show { display: block; }
   .m-panel {
     position: absolute; top: 90px; bottom: 90px; left: 50%; width: 980px; margin-left: -490px;
-    background: rgba(18,20,28,0.94); border-radius: 30px; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    background: #12141c; border-radius: 30px; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
     padding: 44px 50px 0;
   }
   .m-title { font-size: 40px; font-weight: 600; }
@@ -566,6 +566,15 @@
     });
   }
   checkUpdate();
+
+  // HOME när hemskärmen redan körs (LG:s ändrade hemrad startar den utan att ladda om):
+  // börja om på apparna, och ladda om sidan efter en halvtimme så att vädret och apparna är färska.
+  var loadedAt = Date.now();
+  document.addEventListener("webOSRelaunch", function() {
+    if (Meny.isOpen()) return;
+    if (Date.now() - loadedAt > 30 * 60 * 1000) { location.reload(); return; }
+    focusAt(INGANGAR_FORST ? 1 : 0, 0);
+  });
 </script>
 <script src="meny.js"></script>
 </body>

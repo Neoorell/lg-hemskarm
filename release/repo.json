@@ -14,18 +14,18 @@
       "iconUri": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/app-icon.png",
       "manifest": {
         "id": "se.minhemskarm.launcher",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "type": "web",
         "title": "Hemskärm",
         "appDescription": "Egen hemskärm med bakgrundsbild, klocka, väder, HDMI och dina appar. Öppnas med HOME.",
         "iconUri": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/app-icon.png",
         "sourceUrl": "https://github.com/Neoorell/lg-hemskarm",
         "rootRequired": true,
-        "ipkUrl": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/se.minhemskarm.launcher_2.2.0_all.ipk",
+        "ipkUrl": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/se.minhemskarm.launcher_2.3.0_all.ipk",
         "ipkHash": {
-          "sha256": "910100f418c18012eb58fdf69b7c41a07de8ad89d0dcb7bf355843af5e6653bf"
+          "sha256": "139b695a69d3a54efeac04dfe0a61a666e69a50bf55db94a8579cc133d2c59cc"
         },
-        "ipkSize": 37620
+        "ipkSize": 40258
       }
     }
   ]

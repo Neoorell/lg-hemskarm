@@ -6,6 +6,8 @@ En hemskärm i Luma- och Apple TV-stil:
 - **HDMI 1 och HDMI 2** och apparna **Stremio, TV4 Play, SVT Play, Netflix, YouTube, HBO Max och Prime Video**
 - öppnas när du trycker **HOME** och när du **slår på TV:n**
 - **uppdateras via Homebrew Channel**, precis som andra homebrew-appar
+- **ersätter LG:s meny**, blockerar LG:s reklamservrar och stänger av LG:s reklam- och statistiktjänster,
+  så att TV:n får mer ledigt minne och blir snabbare
 
 Projektet: https://github.com/Neoorell/lg-hemskarm
 
@@ -48,7 +50,16 @@ Sist ber det dig **trycka HOME tre gånger** på fjärrkontrollen, så att den l
 
 Tryck HOME. Klart! 🎉
 
-> LG:s smala hemrad kan synas en kort stund innan hemskärmen tar över. Det är normalt.
+> Direkt efter att TV:n slagits på kan LG:s meny synas den första halvminuten. Sedan tar Hemskärm över.
+
+## Det här stänger Hemskärm av hos LG
+
+Allt görs på nytt vid varje start och ändrar inga systemfiler. Tas Hemskärm bort är allt som förut.
+- **LG:s meny** (hemraden): HOME öppnar Hemskärm direkt i stället.
+- **Reklam och spårning:** LG:s reklamservrar och Live Plus (som känner igen vad du tittar på) blockeras,
+  och tjänsterna för reklam, rekommendationer, tips och statistik stoppas.
+- **Förladdade appar:** YouTube och webbläsaren stängs när de ligger i bakgrunden utan att användas.
+  De öppnas som vanligt när du väljer dem. Netflix och övriga appar rörs inte.
 
 ---
 

@@ -13,6 +13,10 @@ var fs = require("fs");
 var path = require("path");
 var childProcess = require("child_process");
 
+// Vid uppstart (Homebrew Channels init.d) saknas PATH helt; då hittas bara /bin och /usr/bin,
+// inte t.ex. /sbin/initctl.
+process.env.PATH = (process.env.PATH ? process.env.PATH + ":" : "") + "/usr/sbin:/usr/bin:/sbin:/bin";
+
 var APP_ID = "se.minhemskarm.launcher";
 var HOME_DIR = process.env.CUSTOMHOME_DIR || "/media/developer/custom_home";
 var CONF = path.join(HOME_DIR, "homekey.conf");
@@ -74,6 +78,145 @@ function launchHome(reason) {
   luna("luna://com.webos.applicationManager/closeByAppId", { id: APP_ID }, 3000, function() {
     luna("luna://com.webos.applicationManager/launch", { id: APP_ID }, 5000);
   });
+}
+
+function foregroundApp(cb) {
+  luna("luna://com.webos.applicationManager/getForegroundAppInfo", {}, 3000, function(err, out) {
+    var data = parseJson(out);
+    cb(data ? data.appId || "" : null);
+  });
+}
+
+// ---- LG:s hemrad och bakgrundsfunktioner ----
+// Allt här är tillfälligt: bind mounts och stoppade tjänster försvinner vid omstart, så
+// systemfilerna ändras aldrig. Tjänsten gör om det vid varje start (init.d).
+
+var LG_HOME_QML = "/usr/palm/applications/com.webos.app.home/qml/main.qml";
+var LG_HOME_SNAPSHOTS = ["/mnt/lg/cmn_data/checkpoint/com.webos.app.home", "/tmp/checkpoint/com.webos.app.home"];
+var PATCH_DIR = path.join(HOME_DIR, "lghome");
+var lgHomePatched = false;
+
+function mounted(target) {
+  try { return fs.readFileSync("/proc/mounts", "utf8").indexOf(" " + target + " ") !== -1; } catch (e) { return false; }
+}
+
+// LG:s hemrad (QML) får några rader: när den startas av HOME startar den Hemskärm via sin egen
+// launchApp, som också döljer LG:s rad. LG:s fil kopieras inte till repot; ändringen görs här.
+// Ser filen inte ut som väntat (t.ex. efter en firmwareuppdatering) lämnas LG:s hemrad orörd.
+function patchLgHomeQml(orig) {
+  var start = "        function start(mode) {\n";
+  var root = "    id: rootWindow\n";
+  if (orig.split(start).length !== 2 || orig.split(root).length !== 2 ||
+      orig.indexOf("property alias interfaces: interfaceLayer.interfaces") === -1 ||
+      orig.indexOf("se.minhemskarm") !== -1) return null;
+  var props = [
+    "",
+    "    // Hemskärm (" + APP_ID + "): HOME öppnar den egna hemskärmen i stället för LG:s rad.",
+    "    property bool hemskarmPending: false",
+    "    Timer {",
+    "        interval: 50; repeat: true; running: rootWindow.hemskarmPending",
+    "        onTriggered: {",
+    "            var app = rootWindow.interfaces ? rootWindow.interfaces.application : null;",
+    "            if (!app || !app.launchApp) return;",
+    "            rootWindow.hemskarmPending = false;",
+    "            app.launchApp(\"" + APP_ID + "\", \"\", {}, \"homeKey\");",
+    "        }",
+    "    }",
+    ""
+  ].join("\n");
+  var hook = "            if (mode === \"home\" || mode === \"main\") rootWindow.hemskarmPending = true;\n";
+  return orig.replace(root, root + props + "\n").replace(start, start + hook);
+}
+
+function sh(args, cb) { run(args[0], args.slice(1), 10000, function(err) { if (cb) cb(!err); }); }
+
+function patchLgHome(done) {
+  if (mounted(LG_HOME_QML)) { lgHomePatched = true; return done(true); }
+  var patched = null;
+  try { patched = patchLgHomeQml(fs.readFileSync(LG_HOME_QML, "utf8")); } catch (e) {}
+  if (!patched) { log("LG:s hemrad ser inte ut som väntat - lämnas orörd"); return done(false); }
+  try {
+    if (!fs.existsSync(PATCH_DIR)) fs.mkdirSync(PATCH_DIR);
+    if (!fs.existsSync(path.join(PATCH_DIR, "tom"))) fs.mkdirSync(path.join(PATCH_DIR, "tom"));
+    writeAtomic(path.join(PATCH_DIR, "main.qml"), patched);
+  } catch (e) { log("kunde inte skriva LG-hemradens fil: " + e.message); return done(false); }
+  sh(["mount", "-o", "bind", path.join(PATCH_DIR, "main.qml"), LG_HOME_QML], function(ok) {
+    if (!ok) { log("kunde inte ersätta LG:s hemrad"); return done(false); }
+    // LG:s hemrad startar från en färdig minnesbild (CRIU) med originalet i; göm den.
+    LG_HOME_SNAPSHOTS.forEach(function(dir) {
+      if (fs.existsSync(dir) && !mounted(dir)) {
+        sh(["mount", "-o", "bind", path.join(PATCH_DIR, "tom"), dir], function() {
+          sh(["mount", "-o", "remount,bind,ro", dir]);
+        });
+      }
+    });
+    // Stoppa den körande hemraden; nästa HOME startar den ändrade.
+    sh(["sh", "-c", "for p in $(pidof com.webos.app.home); do kill -9 $p; done"], function() {
+      lgHomePatched = true;
+      log("LG:s hemrad ersatt - HOME öppnar Hemskärm direkt");
+      done(true);
+    });
+  });
+}
+
+// LG:s reklam- och spårningsservrar pekas om till TV:n själv. /etc/hosts byts med en
+// bind mount (som Homebrew Channel gör när uppdateringar blockeras).
+var HOSTS_MARK = "# Hemskärm: LG:s reklam- och spårningsservrar";
+var BLOCKED_HOSTS = [
+  "ad.lgsmartad.com", "us.ad.lgsmartad.com", "eu.ad.lgsmartad.com",
+  "info.lgsmartad.com", "us.info.lgsmartad.com", "eu.info.lgsmartad.com",
+  "ngfts.lge.com", "aic-ngfts.lge.com", "eic-ngfts.lge.com", "qt2-ngfts.lge.com",
+  "us.ibs.lgappstv.com", "eu.ibs.lgappstv.com", "lgad.cjpowercast.com"
+];
+function blockAdServers() {
+  var hosts = "";
+  try { hosts = fs.readFileSync("/etc/hosts", "utf8"); } catch (e) { return; }
+  if (hosts.indexOf(HOSTS_MARK) !== -1) return;
+  var lines = [HOSTS_MARK];
+  BLOCKED_HOSTS.forEach(function(h) { lines.push("127.0.0.1 " + h); });
+  try { writeAtomic(path.join(HOME_DIR, "hosts"), hosts.replace(/\n*$/, "\n\n") + lines.join("\n") + "\n"); } catch (e) { return; }
+  sh(["mount", "-o", "bind", path.join(HOME_DIR, "hosts"), "/etc/hosts"], function(ok) {
+    log(ok ? "LG:s reklamservrar blockerade" : "kunde inte blockera LG:s reklamservrar");
+  });
+}
+
+// LG:s reklam-, rekommendations- och statistiktjänster (upstart-jobb). De startar igen vid omstart,
+// och vissa (nudge) först en stund efter uppstarten, så stoppet görs om med jämna mellanrum.
+var LG_JOBS = ["admanager", "contentminer", "nudge", "uploadd", "rdxd"];
+function stopLgJobs() {
+  var stopped = [], left = LG_JOBS.length;
+  LG_JOBS.forEach(function(job) {
+    sh(["initctl", "stop", job], function(ok) {
+      if (ok) stopped.push(job);
+      if (!--left && stopped.length) log("stoppade LG-tjänster: " + stopped.join(", "));
+    });
+  });
+}
+
+// Appar som LG förladdar i bakgrunden men som inte används. Stängs när de inte syns.
+var UNWANTED_PRELOADS = ["youtube.leanback.v4", "com.webos.app.browser"];
+function closePreloads() {
+  foregroundApp(function(fg) {
+    if (fg === null) return;
+    luna("luna://com.webos.applicationManager/running", {}, 5000, function(err, out) {
+      var data = parseJson(out), running = (data && data.running || []).map(function(a) { return a.id; });
+      UNWANTED_PRELOADS.forEach(function(id) {
+        if (id !== fg && running.indexOf(id) !== -1) {
+          luna("luna://com.webos.applicationManager/closeByAppId", { id: id }, 5000);
+          log("stängde förladdad app: " + id);
+        }
+      });
+    });
+  });
+}
+
+function setupLg() {
+  patchLgHome(function() {});
+  blockAdServers();
+  stopLgJobs();
+  setTimeout(function() { stopLgJobs(); closePreloads(); }, 60000);
+  setTimeout(stopLgJobs, 3 * 60 * 1000);
+  setInterval(function() { stopLgJobs(); closePreloads(); }, 10 * 60 * 1000);
 }
 
 // ---- app-listan ----
@@ -226,7 +369,14 @@ function watchKeys(onKey) {
 function homekeyWatcher() {
   log("bevakar Home-knappen, kod(er): " + readCodes().join(","));
   watchKeys(function(file, code) {
-    if (readCodes().indexOf(code) !== -1) launchHome("Home-knappen");
+    if (readCodes().indexOf(code) === -1) return;
+    if (!lgHomePatched) return launchHome("Home-knappen");
+    // Den ändrade LG-hemraden startar Hemskärm själv; kliv bara in om den inte syns.
+    setTimeout(function() {
+      foregroundApp(function(fg) {
+        if (fg === "" || fg === "com.webos.app.home") launchHome("Home-knappen, reserv");
+      });
+    }, 2500);
   });
 }
 
@@ -400,6 +550,7 @@ function main() {
     refreshApps();
     refreshWeather();
     refreshBackground();
+    if (!process.env.CUSTOMHOME_DIR) setupLg();
     setInterval(refreshWeather, 30 * 60 * 1000);
     setInterval(refreshBackground, 15000);
     watchSelf();

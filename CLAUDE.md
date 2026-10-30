@@ -29,7 +29,7 @@ rootning: svara på svenska, förklara enkelt och skriv ut exakt vilka kommandon
 - [x] Kör `setup.sh` en gång (GUIDE.md steg 3). I 2.1.0 frös tjänsten direkt (se Begränsningar); rättat i 2.1.1.
 - [x] Uppdatera till 2.1.1 på TV:n och bekräfta att HOME öppnar hemskärmen med riktiga fjärrkontrollen.
 - [x] Bekräfta att LG:s ikoner syns i 2.1.3 (2.1.2 visade reservloggorna eftersom bilderna blockerades).
-- [ ] 2.2.0 på TV:n: testa menyn (spara, väder, ingångar), BACK och gula knappen med riktiga fjärrkontrollen.
+- [ ] 2.3.0 på TV:n: testa menyn, BACK, gula knappen och HOME med riktiga fjärrkontrollen, även efter omstart.
 - [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (väljs nu i menyn).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
@@ -61,6 +61,8 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   `backdrop-filter`, `scrollTo({behavior})`. Bara ES5 (var/function, inga pilar, mallsträngar, let/const).
   Fjärrkontrollen skickar `keyCode` (37–40 pilar, 13 OK, 461 BACK, 405 gul). BACK når bara sidan tack vare
   `"disableBackHistoryAPI": true` i `appinfo.json`; utan den stänger BACK hemskärmen och LG:s meny syns.
+- **Vid uppstart saknar tjänsten PATH** (Homebrew Channels init.d); bara /bin och /usr/bin hittas. Därför sätter
+  `customhome.js` PATH själv överst. Testa uppstartsändringar med en riktig omstart (`reboot` över SSH).
 - **node 0.12** för `customhome.js`: samma ES5-regler, `new Buffer`, inga löften/async.
   **Läs aldrig `/dev/input` med `fs.read`**: varje väntande läsning låser en av trådpoolens 4 trådar
   (`UV_THREADPOOL_SIZE` går inte att höja inifrån) och hela node fryser vid nästa `spawn`/`execFile`.
@@ -77,6 +79,22 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   ger fel), men `<script src="file:///media/developer/custom_home/...">` fungerar. Bilder från TV:n
   (app-ikoner, `bakgrund.jpg`) skrivs därför av tjänsten som data-URL:er i `ikoner.js` och `bakgrund.js`.
 - Appens `trustLevel` ska vara `default` (`trusted` avvisas för tredjepartsappar).
+
+## LG:s hemrad och bakgrundsfunktioner (`setupLg` i customhome.js)
+
+- **LG:s hemrad ersätts** (som Homebar gör): tjänsten patchar LG:s
+  `/usr/palm/applications/com.webos.app.home/qml/main.qml` på TV:n (`patchLgHomeQml`: en `Timer` som anropar
+  `interfaces.application.launchApp("se.minhemskarm.launcher", …)` när `start(mode)` får `home`/`main`),
+  bind-monterar kopian från `custom_home/lghome/`, gömmer CRIU-minnesbilderna
+  (`/mnt/lg/cmn_data/checkpoint/com.webos.app.home`, `/tmp/checkpoint/…`) och dödar `com.webos.app.home`.
+  LG:s fil är upphovsrättsskyddad – lägg den aldrig i repot. Matchar filen inte (firmwareuppdatering) lämnas den.
+  Knappbevakningen är då bara reserv (startar Hemskärm om den inte syns 2,5 s efter HOME).
+  HDMI → HOME → Hemskärm tar ~1,3 s. Sidan får `webOSRelaunch` i stället för att laddas om.
+- **Reklam:** `/etc/hosts` bind-monteras med `BLOCKED_HOSTS` (lgsmartad, ngfts/ACR, ibs.lgappstv, cjpowercast).
+- **Upstart-jobb stoppas:** admanager, contentminer, nudge, uploadd, rdxd (`initctl stop`).
+- **Förladdade appar stängs** när de inte syns: YouTube och webbläsaren (Netflix ska ägaren ha kvar).
+- Testat med två omstarter: HOME från HDMI → Hemskärm 1,7 s första gången, sedan ~0,9 s.
+- Minne före/efter: 188 → 366 MB tillgängligt av 1 GB. `uninstall.sh` tar bort allt direkt.
 
 ## Ikonerna
 

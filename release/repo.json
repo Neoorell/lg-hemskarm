@@ -9,7 +9,7 @@
     {
       "id": "se.minhemskarm.launcher",
       "title": "Hemskärm",
-      "shortDescription": "Egen hemskärm med bakgrundsbild, klocka, väder, HDMI och dina appar. Öppnas med HOME.",
+      "shortDescription": "Egen hemskärm som ersätter LG:s meny: bakgrund, klocka, väder, dina appar och ingångar.",
       "fullDescriptionUrl": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/description.html",
       "iconUri": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/app-icon.png",
       "manifest": {
@@ -17,7 +17,7 @@
         "version": "2.5.0",
         "type": "web",
         "title": "Hemskärm",
-        "appDescription": "Egen hemskärm med bakgrundsbild, klocka, väder, HDMI och dina appar. Öppnas med HOME.",
+        "appDescription": "Egen hemskärm som ersätter LG:s meny: bakgrund, klocka, väder, dina appar och ingångar.",
         "iconUri": "https://raw.githubusercontent.com/Neoorell/lg-hemskarm/main/release/app-icon.png",
         "sourceUrl": "https://github.com/Neoorell/lg-hemskarm",
         "rootRequired": true,

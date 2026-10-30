@@ -82,12 +82,28 @@ def main():
     build_ipk(ipk)
     shutil.copy(os.path.join(APP, "largeIcon.png"), os.path.join(DIST, "app-icon.png"))
 
-    short = "Egen hemskärm med bakgrundsbild, klocka, väder, HDMI och dina appar. Öppnas med HOME."
+    # Beskrivningen i Homebrew Channel. Håll den i synk med funktionerna, men lova bara det som är
+    # verifierat på TV:n (se CLAUDE.md).
+    short = "Egen hemskärm som ersätter LG:s meny: bakgrund, klocka, väder, dina appar och ingångar."
+    features = [
+        "Bakgrundsbild: välj bland foton, låt den växla var 15:e minut eller ladda upp en egen från mobilen med en QR-kod.",
+        "Klocka, datum och väder för din ort.",
+        "Dina appar med TV:ns egna ikoner och dina HDMI-ingångar; tomma ingångar döljs. Alla appar finns ett klick bort.",
+        "Håll OK på en app för att flytta eller ta bort den.",
+        "HOME öppnar Hemskärm direkt i stället för LG:s meny.",
+        "Inställningar på TV:n (kugghjulet eller gula knappen): appar, ingångar, bakgrund, väder, snabbstart, ljud ut, genvägar till TV:ns inställningar och uppdateringar.",
+        "BACK två gånger visar apparna som körs i bakgrunden och hur mycket minne de tar; stäng en eller alla.",
+        "Snabbare TV: LG:s reklam- och Live Plus-servrar blockeras, LG:s statistiktjänster stoppas och förladdade YouTube och webbläsaren stängs.",
+        "Allt återställs när Hemskärm tas bort. Systemfilerna ändras aldrig.",
+    ]
     with open(os.path.join(DIST, "description.html"), "w") as f:
-        f.write("<p>%s</p>\n<p>Efter första installationen: kör "
+        f.write("<p>%s</p>\n<ul>\n%s</ul>\n"
+                "<p>Testad på LG 43UM7100PLB med webOS 4.5. Kräver root och SSH.</p>\n"
+                "<p>Efter första installationen: kör "
                 "<code>sh /media/developer/apps/usr/palm/applications/%s/setup/setup.sh</code> "
                 "som root för att koppla HOME-knappen. Senare uppdateringar behöver inte det.</p>\n"
-                "<p>Mer information: https://github.com/%s</p>\n" % (short, app_id, GITHUB_REPO))
+                "<p>Mer information: https://github.com/%s</p>\n"
+                % (short, "".join("<li>%s</li>\n" % x for x in features), app_id, GITHUB_REPO))
 
     base = "https://raw.githubusercontent.com/%s/main/release/" % GITHUB_REPO
     manifest = {

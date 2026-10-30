@@ -145,6 +145,13 @@ och färger i (provade kvadratiska och förstorade/beskurna ikoner, ville inte h
 
 ## Bygga och släppa en ny version
 
+- **Versionsnummer** (semantisk versionering, som Luma): buggfix höjer sista siffran (2.5.0 → 2.5.1),
+  ny funktion höjer mittensiffran (2.5.x → 2.6.0). Bara dokumentation: ingen ny version.
+- **Bygg aldrig om ett publicerat paket under samma version.** `build_ipk.py` ger ett nytt paket (ny sha256)
+  varje gång; ska bara beskrivningen ändras, återställ `.ipk` med git och rätta hash/storlek i `repo.json`.
+- **Homebrew Channels beskrivning** (`features` i `build/build_ipk.py`) ska följa med när funktioner läggs till
+  eller ändras, men bara lova det som är verifierat på TV:n.
+
 **Installera inte en opublicerad version på TV:n** (t.ex. via `appInstallService/dev/install`):
 Homebrew Channel ser att versionen skiljer sig från `repo.json` och installerar tillbaka den publicerade.
 Testa i stället med `CUSTOMHOME_DIR=/tmp/…` och en förhandsvisning på Macen, och publicera sedan.

@@ -58,8 +58,11 @@ Allt görs på nytt vid varje start och ändrar inga systemfiler. Tas Hemskärm 
 - **LG:s meny** (hemraden): HOME öppnar Hemskärm direkt i stället.
 - **Reklam och spårning:** LG:s reklamservrar och Live Plus (som känner igen vad du tittar på) blockeras,
   och tjänsterna för reklam, rekommendationer, tips och statistik stoppas.
-- **Förladdade appar:** YouTube och webbläsaren stängs när de ligger i bakgrunden utan att användas.
+- **Förladdade appar:** YouTube och webbläsaren stängs så fort LG förladdar dem i bakgrunden.
   De öppnas som vanligt när du väljer dem. Netflix och övriga appar rörs inte.
+
+**Om 4K:** menyer och appar ritas i 1920×1080 på den här TV:n (LG:s grafiklager), men film och serier
+visas i 4K när innehållet finns i 4K, eftersom videon har ett eget lager.
 
 ---
 
@@ -71,10 +74,21 @@ fjärrkontrollen. Där kan du:
 - **Ingångar:** visa eller dölj HDMI 1–3 och byt namn, t.ex. till "PlayStation".
 - **Bakgrund:** välj bland några foton, bara stjärnhimmel eller din egen bild.
 - **Väder:** välj ort i listan eller sök efter en annan.
+- **Snabbstart:** välj upp till två appar som förladdas, så att de öppnas direkt (TV4 Play från början).
 - **Uppdateringar:** se om en ny version finns och installera den direkt.
 
 **BACK** går tillbaka ett steg. Ändringarna sparas när du stänger menyn, och hemskärmen laddas om.
-BACK på själva hemskärmen gör ingenting, så du hamnar inte i LG:s gamla meny av misstag.
+BACK en gång på själva hemskärmen gör ingenting, så du hamnar inte i LG:s gamla meny av misstag.
+
+## Appar som körs (BACK två gånger)
+
+Tryck **BACK två gånger snabbt** på hemskärmen, så visas apparna som ligger i bakgrunden och
+hur mycket minne de tar, i samma stil som inställningarna:
+- **▲ ▼** väljer app, **OK** stänger den, **▶** öppnar den.
+- **Stäng alla** längst ned stänger allihop.
+- **BACK** tillbaka till hemskärmen.
+
+En app med snabbstart som du stänger här förladdas inte igen förrän efter en halvtimme.
 
 ## Uppdateringar
 

@@ -193,30 +193,114 @@ function stopLgJobs() {
   });
 }
 
-// Appar som LG förladdar i bakgrunden men som inte används. Stängs när de inte syns.
+// ---- förladdade appar ----
+// LG förladdar appar i bakgrunden. De som inte används stängs så fort de dyker upp, och
+// apparna under "Snabbstart" i menyn förladdas i stället, så att de öppnas direkt.
+// En app som har synts (som du har öppnat) rörs aldrig.
 var UNWANTED_PRELOADS = ["youtube.leanback.v4", "com.webos.app.browser"];
-function closePreloads() {
+var DEFAULT_QUICKSTART = ["com.telia.tv4"];
+var seenApps = {}, lastPreload = {}, powerState = null;
+
+function readSettings() {
+  try {
+    var t = fs.readFileSync(SETTINGS_JS, "utf8");
+    return JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1));
+  } catch (e) { return {}; }
+}
+// Appar som stängts i hemskärmens applista (setup/appar.sh) förladdas inte igen på en halvtimme.
+function closedByUser(id) {
+  var lines = [];
+  try { lines = fs.readFileSync("/tmp/hemskarm-stangda", "utf8").split("\n"); } catch (e) {}
+  var now = Date.now() / 1000;
+  return lines.some(function(l) {
+    var p = l.split(" ");
+    return p[0] === id && now - (+p[1]) < 30 * 60;
+  });
+}
+function memAvailableMb() {
+  var m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync("/proc/meminfo", "utf8"));
+  return m ? Math.round(m[1] / 1024) : 0;
+}
+
+function checkApps() {
   foregroundApp(function(fg) {
     if (fg === null) return;
     luna("luna://com.webos.applicationManager/running", {}, 5000, function(err, out) {
-      var data = parseJson(out), running = (data && data.running || []).map(function(a) { return a.id; });
+      var data = parseJson(out);
+      if (!data || !data.running) return;
+      var running = data.running.map(function(a) { return a.id; });
+      Object.keys(seenApps).forEach(function(id) { if (running.indexOf(id) === -1) delete seenApps[id]; });
+      if (fg) seenApps[fg] = true;
       UNWANTED_PRELOADS.forEach(function(id) {
-        if (id !== fg && running.indexOf(id) !== -1) {
+        if (running.indexOf(id) !== -1 && !seenApps[id]) {
           luna("luna://com.webos.applicationManager/closeByAppId", { id: id }, 5000);
           log("stängde förladdad app: " + id);
         }
       });
+      var s = readSettings(), quick = s.snabbstart instanceof Array ? s.snabbstart : DEFAULT_QUICKSTART;
+      if (powerState !== "Active" || uptime() < 120) return;
+      quick.forEach(function(id) {
+        if (running.indexOf(id) !== -1 || Date.now() - (lastPreload[id] || 0) < 10 * 60 * 1000) return;
+        if (closedByUser(id)) return;
+        if (memAvailableMb() < 150) return;
+        lastPreload[id] = Date.now();
+        luna("luna://com.webos.applicationManager/launch", { id: id, preload: "full" }, 10000, function(e, o) {
+          var r = parseJson(o);
+          if (r && r.returnValue) log("förladdade " + id + " (snabbstart)");
+        });
+      });
     });
   });
+}
+
+// Applistan på hemskärmen (BACK två gånger) läser korande.js, så att den visas direkt.
+// Den skrivs om varje gång en app startar eller stängs.
+var RUNNING_JS = path.join(HOME_DIR, "korande.js");
+function processKb(pid) {
+  try { return +(/VmRSS:\s+(\d+)/.exec(fs.readFileSync("/proc/" + pid + "/status", "utf8"))[1]); } catch (e) { return 0; }
+}
+function writeRunning() {
+  luna("luna://com.webos.applicationManager/running", {}, 5000, function(err, out) {
+    var data = parseJson(out);
+    if (!data || !data.running) return;
+    var apps = data.running.map(function(a) {
+      return { id: a.id, kb: processKb(a.processid) || processKb(a.webprocessid) };
+    });
+    try {
+      writeAtomic(RUNNING_JS, "window.TV_KORANDE = " +
+        JSON.stringify({ tid: Date.now(), appar: apps, ledigtMb: memAvailableMb() }) + ";\n");
+    } catch (e) {}
+  });
+}
+
+// Listan över körande appar ändras: skriv applistan direkt, och kolla förladdningarna några
+// sekunder senare, när det står klart vilken app som syns.
+var checkTimer = null, runningTimer = null;
+function appsChanged() {
+  clearTimeout(runningTimer);
+  runningTimer = setTimeout(writeRunning, 1000);
+  clearTimeout(checkTimer);
+  checkTimer = setTimeout(checkApps, 6000);
+}
+function runningWatcher() {
+  var p = childProcess.spawn("luna-send",
+    ["-i", "-n", "0", "luna://com.webos.applicationManager/running", '{"subscribe":true}']);
+  p.stdout.on("data", appsChanged);
+  p.on("error", function() {});
+  p.on("exit", function() { setTimeout(runningWatcher, 5000); });
+  extraProcs.push(p);
 }
 
 function setupLg() {
   patchLgHome(function() {});
   blockAdServers();
   stopLgJobs();
-  setTimeout(function() { stopLgJobs(); closePreloads(); }, 60000);
-  setTimeout(stopLgJobs, 3 * 60 * 1000);
-  setInterval(function() { stopLgJobs(); closePreloads(); }, 10 * 60 * 1000);
+  runningWatcher();
+  writeRunning();
+  setTimeout(function() { stopLgJobs(); checkApps(); }, 60000);
+  setTimeout(function() { stopLgJobs(); checkApps(); }, 3 * 60 * 1000);
+  setInterval(function() { stopLgJobs(); checkApps(); }, 10 * 60 * 1000);
+  setInterval(writeRunning, 2 * 60 * 1000);
 }
 
 // ---- app-listan ----
@@ -386,7 +470,7 @@ function uptime() {
   try { return parseFloat(fs.readFileSync("/proc/uptime", "utf8").split(" ")[0]); } catch (e) { return 9999; }
 }
 
-var powerProc = null;
+var powerProc = null, extraProcs = [];
 
 function powerWatcher() {
   var prev = null;
@@ -409,7 +493,7 @@ function powerWatcher() {
         refreshApps();
         launchHome("TV:n slogs på");
       }
-      prev = state;
+      prev = powerState = state;
     }
     pending = pending.slice(last);
   });
@@ -425,6 +509,7 @@ function powerWatcher() {
 // Stäng cat-processerna och luna-send innan node avslutas, så att de inte blir kvar på TV:n.
 function hardExit() {
   Object.keys(keyProcs).forEach(function(file) { keyProcs[file].kill(); });
+  extraProcs.forEach(function(p) { p.kill(); });
   if (powerProc) powerProc.kill();
   process.exit(0);
 }
@@ -484,6 +569,11 @@ function cleanSettings(s) {
     });
   }
   if (typeof s.bakgrund === "string" && /^[a-z0-9\-]{1,20}$/.test(s.bakgrund)) out.bakgrund = s.bakgrund;
+  if (s.snabbstart instanceof Array) {
+    out.snabbstart = s.snabbstart.filter(function(id) {
+      return typeof id === "string" && /^[\w.\-]{1,100}$/.test(id);
+    }).slice(0, 2);
+  }
   if (s.ort && typeof s.ort.lat === "number" && typeof s.ort.lon === "number" &&
       Math.abs(s.ort.lat) <= 90 && Math.abs(s.ort.lon) <= 180) {
     out.ort = { namn: cleanText(s.ort.namn, 40) || "Okänd ort", lat: s.ort.lat, lon: s.ort.lon };

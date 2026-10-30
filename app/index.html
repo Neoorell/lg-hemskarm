@@ -111,6 +111,16 @@
   .m-hint { position: absolute; left: 50px; right: 50px; bottom: 34px; font-size: 19px; color: rgba(255,255,255,0.55); }
   .m-hint b { color: #fff; font-weight: 600; }
 
+  /* ---- applistan (BACK två gånger): samma panel som menyn ---- */
+  #vaxlare { background: rgba(0,0,0,0.72); display: none; }
+  #vaxlare.show { display: block; }
+  .m-row { transition: transform .3s ease, opacity .3s ease; }
+  .m-row.gone { transform: translateX(-80px); opacity: 0; }
+  .m-row.danger .m-label { color: #ff6b7a; font-weight: 600; }
+  .m-row.danger.focused { background: #ff4757; }
+  .m-row.danger.focused .m-label { color: #fff; }
+  .v-empty { position: absolute; top: 160px; left: 50px; font-size: 26px; color: rgba(255,255,255,0.7); display: none; }
+
   #toast {
     position: absolute; left: 50%; top: 64px; transform: translateX(-50%);
     background: rgba(0,0,0,0.82); padding: 14px 28px; border-radius: 14px; font-size: 22px;
@@ -149,6 +159,15 @@
       <div class="m-sub" id="m-sub"></div>
       <div class="m-list" id="m-list"></div>
       <div class="m-hint" id="m-hint"></div>
+    </div>
+  </div>
+  <div id="vaxlare" class="fill">
+    <div class="m-panel">
+      <div class="m-title">Appar som körs</div>
+      <div class="m-sub" id="v-sub"></div>
+      <div class="m-list" id="v-list"></div>
+      <div class="v-empty" id="v-empty">Inga appar körs i bakgrunden.</div>
+      <div class="m-hint" id="v-hint"></div>
     </div>
   </div>
   <div id="toast"></div>
@@ -539,13 +558,18 @@
 
   // webOS 4.5 skickar keyCode (37-40 pilar, 13 OK, 461 BACK, 405 gul).
   // BACK når sidan för att appinfo.json har disableBackHistoryAPI; utan det stängs hemskärmen.
+  // BACK en gång gör inget, två gånger snabbt öppnar applistan.
+  var lastBack = 0;
   document.addEventListener("keydown", function(ev) {
     var k = ev.keyCode;
-    if (Meny.isOpen()) {
-      if (Meny.key(k)) ev.preventDefault();
+    if (Vaxlare.isOpen() || Meny.isOpen()) {
+      if ((Vaxlare.isOpen() ? Vaxlare : Meny).key(k)) ev.preventDefault();
       return;
     }
-    if (k === 461) { /* BACK: stanna kvar på hemskärmen */ }
+    if (k === 461) {
+      if (Date.now() - lastBack < 700) { lastBack = 0; Vaxlare.open(); }
+      else lastBack = Date.now();
+    }
     else if (k === 405) Meny.open();
     else if (k === 39) focusAt(curGroup, curIndex + 1);
     else if (k === 37) focusAt(curGroup, curIndex - 1);
@@ -572,10 +596,12 @@
   var loadedAt = Date.now();
   document.addEventListener("webOSRelaunch", function() {
     if (Meny.isOpen()) return;
+    Vaxlare.close();
     if (Date.now() - loadedAt > 30 * 60 * 1000) { location.reload(); return; }
     focusAt(INGANGAR_FORST ? 1 : 0, 0);
   });
 </script>
 <script src="meny.js"></script>
+<script src="vaxlare.js"></script>
 </body>
 </html>

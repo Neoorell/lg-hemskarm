@@ -81,6 +81,10 @@ var Meny = (function() {
         { key: "ing", label: "Ingångar", value: visible.join(", ") || "Inga", ok: function() { go(pageInputs); } },
         { key: "bg", label: "Bakgrund", value: bgName(state.bakgrund), ok: function() { go(pageBg); } },
         { key: "ort", label: "Väder", value: ortNamn(), ok: function() { go(pageWeather); } },
+        { key: "snabb", label: "Snabbstart",
+          value: state.snabbstart.map(function(id) { var a = tvApp(id); return a ? a.title : null; })
+            .filter(Boolean).join(", ") || "Av",
+          ok: function() { go(pageQuick); } },
         { key: "upd", label: "Uppdateringar", value: UPPDATERING ? "Version " + UPPDATERING.version + " finns" : "",
           on: !!UPPDATERING, ok: function() { go(pageUpdates); } },
         { key: "stang", label: changed ? "Spara och stäng" : "Stäng", ok: close }
@@ -127,6 +131,29 @@ var Meny = (function() {
     state.appar[j] = id;
     mark("appar");
     refresh(id);
+  }
+
+  // Appar som förladdas i bakgrunden så att de öppnas direkt. Varje förladdad app tar minne,
+  // och TV:n har bara 1 GB, så högst två.
+  function pageQuick() {
+    var list = state.appar.map(tvApp).filter(Boolean);
+    return {
+      title: "Snabbstart",
+      sub: "Valda appar förladdas och öppnas direkt. Varje app tar 50–100 MB minne, så välj högst två.",
+      hint: "<b>OK</b> på eller av · <b>BACK</b> tillbaka",
+      rows: list.map(function(a) {
+        var on = state.snabbstart.indexOf(a.id) !== -1;
+        return { key: a.id, label: a.title || a.id, thumb: a, value: on ? "På" : "Av", on: on,
+                 ok: function() {
+                   var i = state.snabbstart.indexOf(a.id);
+                   if (i !== -1) state.snabbstart.splice(i, 1);
+                   else if (state.snabbstart.length < 2) state.snabbstart.push(a.id);
+                   else { toast("Högst två appar – stäng av en först"); return; }
+                   mark("snabbstart");
+                   refresh(a.id);
+                 } };
+      })
+    };
   }
 
   function pageInputs() {
@@ -375,6 +402,7 @@ var Meny = (function() {
     if (dirty.ingangar) out.ingangar = state.ingangar;
     if (dirty.bakgrund) out.bakgrund = state.bakgrund;
     if (dirty.ort) out.ort = state.ort;
+    if (dirty.snabbstart) out.snabbstart = state.snabbstart;
     var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(out))));
     toast("Sparar…");
     luna("luna://org.webosbrew.hbchannel.service/exec",
@@ -399,7 +427,8 @@ var Meny = (function() {
           .filter(function(a) { return a.id && !a.missing; }).map(function(a) { return a.id; }),
         ingangar: inputsForMenu(),
         bakgrund: bakgrundId(),
-        ort: null
+        ort: null,
+        snabbstart: (INST.snabbstart instanceof Array ? INST.snabbstart : ["com.telia.tv4"]).slice()
       };
       dirty = {};
       changed = false;

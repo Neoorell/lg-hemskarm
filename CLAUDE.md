@@ -37,7 +37,8 @@ i chatten utan att fråga.
 - [x] Kör `setup.sh` en gång (GUIDE.md steg 3). I 2.1.0 frös tjänsten direkt (se Begränsningar); rättat i 2.1.1.
 - [x] Uppdatera till 2.1.1 på TV:n och bekräfta att HOME öppnar hemskärmen med riktiga fjärrkontrollen.
 - [x] Bekräfta att LG:s ikoner syns i 2.1.3 (2.1.2 visade reservloggorna eftersom bilderna blockerades).
-- [ ] 2.3.0 på TV:n: testa menyn, BACK, gula knappen och HOME med riktiga fjärrkontrollen, även efter omstart.
+- [x] 2.3.0 på TV:n: menyn, BACK och HOME fungerar med riktiga fjärrkontrollen.
+- [ ] 2.4.0: applistan (BACK två gånger) och snabbstart av TV4 med riktiga fjärrkontrollen.
 - [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (väljs nu i menyn).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
@@ -100,7 +101,15 @@ Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den rikti
   HDMI → HOME → Hemskärm tar ~1,3 s. Sidan får `webOSRelaunch` i stället för att laddas om.
 - **Reklam:** `/etc/hosts` bind-monteras med `BLOCKED_HOSTS` (lgsmartad, ngfts/ACR, ibs.lgappstv, cjpowercast).
 - **Upstart-jobb stoppas:** admanager, contentminer, nudge, uploadd, rdxd (`initctl stop`).
-- **Förladdade appar stängs** när de inte syns: YouTube och webbläsaren (Netflix ska ägaren ha kvar).
+- **Förladdade appar:** tjänsten prenumererar på `applicationManager/running`; YouTube och webbläsaren stängs
+  6 s efter att de dykt upp om de inte har synts (Netflix ska ägaren ha kvar). Appar i `snabbstart`
+  (standard TV4 Play, högst två) förladdas med `launch {preload:"full"}` när TV:n är på, minnet > 150 MB och
+  appen inte stängts i applistan senaste 30 min (`/tmp/hemskarm-stangda`).
+- **Applistan** (`app/vaxlare.js`, BACK två gånger; menyns panel: ▲▼ väljer, OK stänger, ▶ öppnar, sista raden Stäng alla): läser `korande.js` som tjänsten skriver vid varje ändring
+  (direkt), stänger via `hbchannel exec` → `setup/appar.sh stang …` (exec tar 1–3 s, kortet försvinner direkt).
+  Sidan får inte anropa `running` eller `closeByAppId` själv.
+- `luna-send` skriver inget inne i `$(...)` i skalskript – skriv till en fil i stället (se `appar.sh`).
+- **4K går inte för grafiken:** compositorn kör `STARFISH_SCREEN_WIDTH/HEIGHT=1920×1080`; video är 4K i eget lager.
 - Testat med två omstarter: HOME från HDMI → Hemskärm 1,7 s första gången, sedan ~0,9 s.
 - Minne före/efter: 188 → 366 MB tillgängligt av 1 GB. `uninstall.sh` tar bort allt direkt.
 

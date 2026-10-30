@@ -1,0 +1,13 @@
+{
+  "id": "se.minhemskarm.launcher",
+  "version": "2.1.0",
+  "vendor": "Egen",
+  "type": "web",
+  "main": "index.html",
+  "title": "Hemskärm",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#05060c",
+  "resolution": "1920x1080",
+  "trustLevel": "default"
+}

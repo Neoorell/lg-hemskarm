@@ -8,7 +8,11 @@ rootning: svara på svenska, förklara enkelt och skriv ut exakt vilka kommandon
 
 - LG 43UM7100PLB (UM71, 2019), firmware 05.40.97, webOS 4.5 (systemversion 4.10.2), chassi k5lp, ARM 32-bit.
 - Rootad med SlopBro, Homebrew Channel installerat, SSH påslaget. TV:n har legat på `192.168.0.222`
-  (kan ändras): `ssh root@192.168.0.222`. Fråga ägaren om lösenordet om det behövs.
+  (kan ändras): `ssh root@192.168.0.222`. Macen loggar in med nyckeln `~/.ssh/lg_tv` (inställd i
+  `~/.ssh/config`), så Claude kan köra kommandon på TV:n direkt med `ssh -o BatchMode=yes root@192.168.0.222 '…'`.
+  Lösenordsinloggning stängs av efter omstart när en nyckel finns.
+- Testa knapptryck utan fjärrkontroll: skriv `struct input_event` (16 byte, typ 1, kod, värde 1/0)
+  till `/dev/input/event1`. Det når både LG:s system och tjänsten.
 - **Ingen python** på TV:n. **node finns** (webOS 4 har node 0.12), även om det inte alltid ligger i PATH
   för SSH-skalet. `curl` finns och klarar GitHub/HTTPS.
 - TV:n har två LG-hemskärmar; "Home screen" är satt till **Basic** och ska vara kvar så.
@@ -20,13 +24,14 @@ rootning: svara på svenska, förklara enkelt och skriv ut exakt vilka kommandon
 - [x] TV rootad, SSH fungerar.
 - [x] Homebar (rawinek/webos-homebar) testades och installerades, men har ingen bakgrundsbild,
   så ägaren vill ha den här hemskärmen i stället.
-- [ ] Avinstallera Homebar: `sh /var/lib/webosbrew/rawin-launcher/uninstall.sh` (på TV:n). `setup.sh` vägrar köra annars.
-- [ ] Lägg till app-källan i Homebrew Channel och installera **Hemskärm** (se GUIDE.md steg 2).
-- [ ] Kör `setup.sh` en gång (GUIDE.md steg 3) och tryck HOME tre gånger när den ber om det.
+- [x] Avinstallera Homebar: `sh /var/lib/webosbrew/rawin-launcher/uninstall.sh` (på TV:n). `setup.sh` vägrar köra annars.
+- [x] Lägg till app-källan i Homebrew Channel och installera **Hemskärm** (se GUIDE.md steg 2).
+- [x] Kör `setup.sh` en gång (GUIDE.md steg 3). I 2.1.0 frös tjänsten direkt (se Begränsningar); rättat i 2.1.1.
+- [ ] Uppdatera till 2.1.1 på TV:n och bekräfta att HOME öppnar hemskärmen med riktiga fjärrkontrollen.
 - [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (`plats.conf`, se GUIDE.md).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
-Allt är testat i Chromium med en låtsad TV och med node 0.12 – men **inte på den riktiga TV:n än**.
+Hemskärmen är installerad på TV:n. Tjänsten i 2.1.1 är testad på den riktiga TV:n med inskickade knapptryck.
 
 ## Projektet
 
@@ -49,7 +54,12 @@ Allt är testat i Chromium med en låtsad TV och med node 0.12 – men **inte p�
   `backdrop-filter`, `scrollTo({behavior})`. Bara ES5 (var/function, inga pilar, mallsträngar, let/const).
   Fjärrkontrollen skickar `keyCode` (37–40 pilar, 13 OK).
 - **node 0.12** för `customhome.js`: samma ES5-regler, `new Buffer`, inga löften/async.
-  `process.exit()` hänger när en tråd väntar på en indataenhet – använd `hardExit()`.
+  **Läs aldrig `/dev/input` med `fs.read`**: varje väntande läsning låser en av trådpoolens 4 trådar
+  (`UV_THREADPOOL_SIZE` går inte att höja inifrån) och hela node fryser vid nästa `spawn`/`execFile`.
+  `watchKeys` läser därför varje enhet via en egen `cat`-process. Avsluta med `hardExit()` så att
+  `cat`-processerna och `luna-send` stängs.
+- TV:n har 9 indataenheter (event0–8, resten av event9–31 saknar enhet). Fjärrkontrollen är
+  "LGE RCU" på `event1`, HOME = kod 773.
 - Appens `trustLevel` ska vara `default` (`trusted` avvisas för tredjepartsappar).
 
 ## Bygga och släppa en ny version

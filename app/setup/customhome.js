@@ -8,10 +8,6 @@
 //
 // Knapp- och påslagsbevakningen bygger på watchers från github.com/NaveenDA/lg-webos-custom-home (MIT).
 
-// Varje öppen indataenhet håller en tråd i libuv:s trådpool medan den väntar på knapptryck,
-// så poolen måste vara större än standardvärdet 4. Sätts innan något fs-anrop görs.
-process.env.UV_THREADPOOL_SIZE = 32;
-
 var fs = require("fs");
 var path = require("path");
 var childProcess = require("child_process");
@@ -140,25 +136,27 @@ function readCodes() {
 
 // Läser knapptryck från alla indataenheter utan att låsa dem, så TV:n fungerar som vanligt.
 // Nya enheter (t.ex. en Magic Remote som återansluter efter standby) plockas upp löpande.
-function watchKeys(onKey) {
-  var open = {};
+// Varje enhet läses av en egen cat-process. fs.read på en indataenhet håller en tråd i
+// libuv:s trådpool (bara 4 trådar i node 0.12, UV_THREADPOOL_SIZE går inte att höja inifrån)
+// och fryser hela node vid nästa spawn så länge en sådan läsning väntar.
+var keyProcs = {};
 
-  function readLoop(file, fd) {
-    var buf = new Buffer(EVENT_SIZE * 64);
-    fs.read(fd, buf, 0, buf.length, null, function(err, n) {
-      if (err || !n) {
-        fs.close(fd, function() {});
-        delete open[file];
-        return;
-      }
-      for (var off = 0; off + EVENT_SIZE <= n; off += EVENT_SIZE) {
+function watchKeys(onKey) {
+  function watch(file, p) {
+    var rest = new Buffer(0);
+    p.stdout.on("data", function(chunk) {
+      var buf = Buffer.concat([rest, chunk]);
+      var off = 0;
+      for (; off + EVENT_SIZE <= buf.length; off += EVENT_SIZE) {
         var type = buf.readUInt16LE(off + TYPE_OFFSET);
         var code = buf.readUInt16LE(off + TYPE_OFFSET + 2);
         var value = buf.readInt32LE(off + TYPE_OFFSET + 4);
         if (type === 1 && value === 1) onKey(file, code);
       }
-      readLoop(file, fd);
+      rest = buf.slice(off);
     });
+    p.on("error", function() {});
+    p.on("exit", function() { if (keyProcs[file] === p) delete keyProcs[file]; });
   }
 
   function scan() {
@@ -167,12 +165,11 @@ function watchKeys(onKey) {
     names.forEach(function(name) {
       if (!/^event\d+$/.test(name)) return;
       var file = path.join(INPUT_DIR, name);
-      if (open[file]) return;
-      try {
-        var fd = fs.openSync(file, "r");
-        open[file] = true;
-        readLoop(file, fd);
-      } catch (e) {}
+      if (keyProcs[file]) return;
+      // Många eventN saknar enhet bakom sig; starta bara cat för de som går att öppna.
+      try { fs.closeSync(fs.openSync(file, "r")); } catch (e) { return; }
+      var p = keyProcs[file] = childProcess.spawn("cat", [file], { stdio: ["ignore", "pipe", "ignore"] });
+      watch(file, p);
     });
   }
 
@@ -227,11 +224,14 @@ function powerWatcher() {
 
 // ---- kommandon ----
 
-// process.exit() hänger i node 0.12 så länge en tråd väntar på knapptryck från en indataenhet,
-// så avsluta med en signal i stället (utskrifterna är redan skrivna, stdout är synkron).
+// Stäng cat-processerna och luna-send innan node avslutas, så att de inte blir kvar på TV:n.
 function hardExit() {
-  process.kill(process.pid, "SIGKILL");
+  Object.keys(keyProcs).forEach(function(file) { keyProcs[file].kill(); });
+  if (powerProc) powerProc.kill();
+  process.exit(0);
 }
+process.on("SIGTERM", hardExit);
+process.on("SIGINT", hardExit);
 
 function learn() {
   var seconds = 20;
@@ -244,7 +244,11 @@ function learn() {
   });
   setTimeout(function() {
     var best = null;
-    Object.keys(counts).forEach(function(c) { if (best === null || counts[c] > counts[best]) best = c; });
+    // Vid lika många tryck vinner LG:s vanliga Home-kod, ifall någon annan knapp råkade tryckas.
+    Object.keys(counts).forEach(function(c) {
+      if (best === null || counts[c] > counts[best] ||
+          (counts[c] === counts[best] && DEFAULT_CODES.indexOf(+c) !== -1)) best = c;
+    });
     if (best === null) {
       console.log("Inga knapptryck upptäcktes. Standardkoden " + DEFAULT_CODES.join(",") + " används.");
       hardExit();
@@ -271,7 +275,6 @@ function watchSelf() {
     log("ny version av tjänsten installerad - startar om");
     var out = fs.openSync("/tmp/customhome.log", "a");
     childProcess.spawn(process.execPath, [__filename, "run"], { detached: true, stdio: ["ignore", out, out] }).unref();
-    if (powerProc) powerProc.kill();
     hardExit();
   }, 60000);
 }

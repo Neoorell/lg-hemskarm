@@ -58,7 +58,6 @@ nohup "$NODE" "$JS" run >>/tmp/customhome.log 2>&1 &
 echo "Bakgrundstjänsten körs (logg: /tmp/customhome.log)"
 echo
 
-# learn avslutar sig själv med en signal, så dölj skalets "Killed"-rad
-( "$NODE" "$JS" learn ) 2>/dev/null
+"$NODE" "$JS" learn
 echo
 echo "Allt klart! Tryck HOME på fjärrkontrollen för att testa."

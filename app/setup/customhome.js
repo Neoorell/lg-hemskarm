@@ -88,6 +88,36 @@ function foregroundApp(cb) {
   });
 }
 
+// ---- vad som visas vid påslag ----
+// Standard är Hemskärm. I menyn ("Vid påslag") kan en HDMI-ingång väljas i stället.
+var INPUT_ID = /^com\.webos\.app\.hdmi[1-9]$/;
+var START_CEC_WAIT = 5000; // en konsol som väcker TV:n (HDMI-CEC) hinner byta ingång inom den här tiden
+var startTimer = null;
+
+function launchInput(id, reason) {
+  log("byter till " + id + " (" + reason + ")");
+  // Fönsterhanteraren startar om föregående app efter en appstart, och då kan Hemskärm lägga sig över
+  // ingången. Stäng den först; HOME startar den igen.
+  luna("luna://com.webos.applicationManager/closeByAppId", { id: APP_ID }, 3000, function() {
+    luna("luna://com.webos.applicationManager/launch", { id: id }, 5000);
+  });
+}
+
+function showStartScreen(reason) {
+  var target = readSettings().startIngang;
+  clearTimeout(startTimer);
+  if (typeof target !== "string" || !INPUT_ID.test(target)) return launchHome(reason);
+  startTimer = setTimeout(function() {
+    if (powerState !== "Active") return;
+    foregroundApp(function(fg) {
+      if (fg === target) return log("står redan på " + target + " (" + reason + ")");
+      // En annan ingång är framme: en konsol väckte TV:n, eller så var den ingången öppen sist. Stör inte.
+      if (fg && INPUT_ID.test(fg)) return log("stannar på " + fg + " (" + reason + ")");
+      launchInput(target, reason);
+    });
+  }, START_CEC_WAIT);
+}
+
 // ---- LG:s hemrad och bakgrundsfunktioner ----
 // Allt här är tillfälligt: bind mounts och stoppade tjänster försvinner vid omstart, så
 // systemfilerna ändras aldrig. Tjänsten gör om det vid varje start (init.d).
@@ -493,6 +523,7 @@ function homekeyWatcher() {
   log("bevakar Home-knappen, kod(er): " + readCodes().join(","));
   watchKeys(function(file, code) {
     if (readCodes().indexOf(code) === -1) return;
+    clearTimeout(startTimer); // HOME direkt efter påslag: låt inte ett väntande ingångsbyte ta över
     if (!lgHomePatched) return launchHome("Home-knappen");
     // Den ändrade LG-hemraden startar Hemskärm själv; kliv bara in om ingen app syns. Det händer ibland
     // när Hemskärm redan var framme: LG:s rad döljs men fokus kommer inte tillbaka. Ta då bara fram
@@ -531,10 +562,10 @@ function powerWatcher() {
         // Kallstart: webOS är klart ungefär 35 s efter strömpåslaget; startar vi före det hamnar vi
         // under live-TV. Homebrew Channel startar oss först runt 40 s, så oftast blir det 2 s.
         var wait = Math.max(2, 35 - uptime());
-        setTimeout(function() { refreshApps(); launchHome("uppstart"); }, wait * 1000);
+        setTimeout(function() { refreshApps(); showStartScreen("uppstart"); }, wait * 1000);
       } else if (state === "Active" && prev !== null && NOT_OFF_STATES.indexOf(prev) === -1) {
         refreshApps();
-        launchHome("TV:n slogs på");
+        showStartScreen("TV:n slogs på");
       }
       prev = powerState = state;
     }
@@ -614,6 +645,7 @@ function cleanSettings(s) {
   if (typeof s.bakgrund === "string" && /^[a-z0-9\-]{1,20}$/.test(s.bakgrund)) out.bakgrund = s.bakgrund;
   if (typeof s.doljTomma === "boolean") out.doljTomma = s.doljTomma;
   if (typeof s.vaxlaBakgrund === "boolean") out.vaxlaBakgrund = s.vaxlaBakgrund;
+  if (typeof s.startIngang === "string" && INPUT_ID.test(s.startIngang)) out.startIngang = s.startIngang;
   if (s.snabbstart instanceof Array) {
     out.snabbstart = s.snabbstart.filter(function(id) {
       return typeof id === "string" && /^[\w.\-]{1,100}$/.test(id);

@@ -133,6 +133,7 @@ var Meny = (function() {
       rows: [
         { key: "appar", label: "Appar på raden", value: state.appar.length + " appar", ok: function() { go(pageApps); } },
         { key: "ing", label: "Ingångar", value: visible.join(", ") || "Inga", ok: function() { go(pageInputs); } },
+        { key: "start", label: "Vid påslag", value: startName(), ok: function() { go(pageStart); } },
         { key: "bg", label: "Bakgrund", value: bgName(state.bakgrund), ok: function() { go(pageBg); } },
         { key: "ort", label: "Väder", value: ortNamn(), ok: function() { go(pageWeather); } },
         { key: "snabb", label: "Snabbstart",
@@ -212,6 +213,30 @@ var Meny = (function() {
                    refresh(a.id);
                  } };
       })
+    };
+  }
+
+  // Vad TV:n visar när den slås på. Tjänsten läser valet (startIngang) vid varje påslag.
+  function startName() {
+    var hit = state.ingangar.filter(function(i) { return i.id === state.startIngang; })[0];
+    return hit ? hit.namn : "Hemskärm";
+  }
+
+  function pageStart() {
+    function row(id, label) {
+      var on = state.startIngang === id;
+      return { key: id || "hem", label: label, value: on ? "Vald" : "", on: on,
+               ok: function() {
+                 state.startIngang = id;
+                 mark("startIngang");
+                 refresh(id || "hem");
+               } };
+    }
+    return {
+      title: "Vid påslag",
+      sub: "Det här visas när TV:n slås på. Väcker en annan HDMI-enhet TV:n stannar den på den enheten. HOME öppnar alltid Hemskärm.",
+      hint: "<b>OK</b> välj · <b>BACK</b> tillbaka",
+      rows: [row("", "Hemskärm")].concat(state.ingangar.map(function(i) { return row(i.id, i.namn); }))
     };
   }
 
@@ -553,7 +578,7 @@ var Meny = (function() {
     busy = true;
     var changes = {};
     if (dirty.appar) changes.appar = state.appar.filter(function(id) { return tvApp(id); });
-    ["ingangar", "bakgrund", "ort", "snabbstart", "doljTomma", "vaxlaBakgrund"].forEach(function(k) {
+    ["ingangar", "bakgrund", "ort", "snabbstart", "doljTomma", "vaxlaBakgrund", "startIngang"].forEach(function(k) {
       if (dirty[k]) changes[k] = state[k];
     });
     toast("Sparar…");
@@ -578,7 +603,8 @@ var Meny = (function() {
         ort: null,
         snabbstart: (INST.snabbstart instanceof Array ? INST.snabbstart : ["com.telia.tv4"]).slice(),
         doljTomma: INST.doljTomma !== false,
-        vaxlaBakgrund: INST.vaxlaBakgrund === true
+        vaxlaBakgrund: INST.vaxlaBakgrund === true,
+        startIngang: INST.startIngang || ""
       };
       dirty = {};
       changed = false;

@@ -73,6 +73,9 @@ fjärrkontrollen. Där kan du:
 - **Appar på raden:** OK lägger till eller tar bort en app, ◀ ▶ flyttar den.
 - **Ingångar:** tomma ingångar (inget anslutet) döljs automatiskt; det går att stänga av.
 - **Ingångar:** visa eller dölj HDMI 1–3 och byt namn, t.ex. till "PlayStation".
+- **Vid påslag:** välj vad TV:n visar när den slås på, Hemskärm eller en HDMI-ingång (till exempel en
+  Google TV-sticka). Står TV:n på en annan HDMI-ingång efter påslag, till exempel för att en PS5 väckte
+  den eller för att den ingången var öppen sist, stannar den där. HOME öppnar alltid Hemskärm.
 - **Bakgrund:** välj bland några foton, bara stjärnhimmel eller din egen bild. **Växla bakgrund** byter
   bild var 15:e minut. **Ladda upp från mobilen** visar en QR-kod (se nedan).
 - **Väder:** välj ort i listan eller sök efter en annan.

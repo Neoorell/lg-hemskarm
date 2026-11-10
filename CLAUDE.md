@@ -41,6 +41,9 @@ i chatten utan att fråga.
 - [ ] 2.4.0: applistan (BACK två gånger) och snabbstart av TV4 med riktiga fjärrkontrollen.
 - [ ] 2.5.0: Ljud ut och genvägarna till TV:ns inställningar (öppnas rätt sida?), QR-uppladdning från en riktig
   mobil, Alla appar, håll OK, växlande bakgrund, tomma ingångar – testa med riktiga fjärrkontrollen.
+- [ ] 2.6.0: "Vid påslag" (`startIngang`, `showStartScreen` i customhome.js) på riktiga TV:n: väntan på CEC
+  (5 s) räcker när PS5 väcker TV:n, Hemskärm lägger sig inte över ingången, HOME fungerar efteråt. Lägg till
+  funktionen i `features` i `build_ipk.py` först när det är verifierat.
 - [ ] Väderort: ägaren har inte sagt vilken ort – standard är Stockholm (väljs nu i menyn).
 - [ ] Eventuell egen bakgrundsbild (`bakgrund.jpg`, se GUIDE.md).
 
